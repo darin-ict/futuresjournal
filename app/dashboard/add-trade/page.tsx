@@ -15,6 +15,7 @@ export default function AddTrade() {
   const [screenshot, setScreenshot] = useState<File | null>(null)
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [challenges, setChallenges] = useState<any[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [form, setForm] = useState({
@@ -29,6 +30,7 @@ export default function AddTrade() {
     mistake_tag: '',
     notes: '',
     is_open: false,
+    challenge_id: '',
   })
 
   useEffect(() => {
@@ -36,9 +38,20 @@ export default function AddTrade() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setUser(user)
+      fetchChallenges(user.id)
     }
     getUser()
   }, [])
+
+  const fetchChallenges = async (userId: string) => {
+    const { data } = await supabase
+      .from('prop_challenges')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+    setChallenges(data || [])
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target
@@ -115,7 +128,6 @@ export default function AddTrade() {
     setLoading(true)
     setError('')
 
-    // Upload screenshot if attached
     let screenshotUrl = null
     if (screenshot) {
       setUploadingImage(true)
@@ -124,18 +136,15 @@ export default function AddTrade() {
       const { error: uploadError } = await supabase.storage
         .from('trade-screenshots')
         .upload(fileName, screenshot)
-
       if (uploadError) {
         setError('Image upload failed: ' + uploadError.message)
         setLoading(false)
         setUploadingImage(false)
         return
       }
-
       const { data: urlData } = supabase.storage
         .from('trade-screenshots')
         .getPublicUrl(fileName)
-
       screenshotUrl = urlData.publicUrl
       setUploadingImage(false)
     }
@@ -154,9 +163,23 @@ export default function AddTrade() {
       mistake_tag: form.mistake_tag || null,
       is_open: form.is_open,
       screenshot_url: screenshotUrl,
+      challenge_id: form.challenge_id || null,
       session: 'RTH',
       emotional_state: 3,
     }])
+
+    // Auto update prop firm balance
+    if (!error && form.challenge_id && pnl !== null && !form.is_open) {
+      const challenge = challenges.find(c => c.id === form.challenge_id)
+      if (challenge) {
+        await supabase
+          .from('prop_challenges')
+          .update({ current_balance: challenge.current_balance + pnl })
+          .eq('id', form.challenge_id)
+        // Refresh challenges so balance is up to date
+        fetchChallenges(user.id)
+      }
+    }
 
     if (error) {
       setError(error.message)
@@ -174,7 +197,7 @@ export default function AddTrade() {
     setForm({
       instrument: 'ES', direction: 'LONG', entry_price: '', exit_price: '',
       stop_loss: '', contracts: '1', trade_date: new Date().toISOString().split('T')[0],
-      setup_tag: '', mistake_tag: '', notes: '', is_open: false,
+      setup_tag: '', mistake_tag: '', notes: '', is_open: false, challenge_id: '',
     })
   }
 
@@ -192,6 +215,11 @@ export default function AddTrade() {
               </div>
             )}
             <p>Saved to your journal.</p>
+            {form.challenge_id && (
+              <p style={{ fontSize: '13px', color: 'var(--accent)' }}>
+                ✓ Prop firm balance updated automatically
+              </p>
+            )}
             <div className={styles.successActions}>
               <button onClick={resetForm} className={styles.btnGhost}>Log Another</button>
               <Link href="/dashboard" className={styles.btnPrimary}>Dashboard</Link>
@@ -216,6 +244,8 @@ export default function AddTrade() {
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
+
+          {/* Trade Details */}
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>📊 Trade Details</h2>
             <div className={styles.grid3}>
@@ -294,8 +324,30 @@ export default function AddTrade() {
             </div>
           </div>
 
+          {/* Setup & Notes */}
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>📋 Setup & Notes</h2>
+
+            {/* Prop Firm Selector */}
+            {challenges.length > 0 && (
+              <div className={styles.field}>
+                <label className={styles.label}>Prop Firm Account</label>
+                <select name="challenge_id" value={form.challenge_id} onChange={handleChange} className={styles.select}>
+                  <option value="">Personal account (no prop firm)</option>
+                  {challenges.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.firm_name} — ${c.account_size.toLocaleString()} (Balance: ${c.current_balance.toFixed(2)})
+                    </option>
+                  ))}
+                </select>
+                {form.challenge_id && (
+                  <p style={{ fontSize: '12px', color: 'var(--accent)', marginTop: '4px' }}>
+                    ✓ P&L will automatically update this account balance when saved
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className={styles.grid2}>
               <div className={styles.field}>
                 <label className={styles.label}>Setup Tag</label>
@@ -327,26 +379,17 @@ export default function AddTrade() {
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>📸 Chart Screenshot</h2>
             <p className={styles.screenshotHint}>Attach your chart at entry/exit. Helps you review your reads later.</p>
-
             {!screenshotPreview ? (
               <div className={styles.uploadZone} onClick={() => fileInputRef.current?.click()}>
                 <span className={styles.uploadIcon}>🖼️</span>
                 <span className={styles.uploadText}>Click to upload chart screenshot</span>
                 <span className={styles.uploadSub}>PNG, JPG, WEBP up to 5MB</span>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleScreenshot}
-                  style={{ display: 'none' }}
-                />
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleScreenshot} style={{ display: 'none' }} />
               </div>
             ) : (
               <div className={styles.screenshotPreview}>
                 <img src={screenshotPreview} alt="Trade screenshot" className={styles.screenshotImg} />
-                <button type="button" onClick={removeScreenshot} className={styles.removeScreenshot}>
-                  ✕ Remove
-                </button>
+                <button type="button" onClick={removeScreenshot} className={styles.removeScreenshot}>✕ Remove</button>
               </div>
             )}
           </div>
@@ -359,6 +402,7 @@ export default function AddTrade() {
               {uploadingImage ? '📸 Uploading image...' : loading ? 'Saving...' : '💾 Save Trade'}
             </button>
           </div>
+
         </form>
       </main>
     </div>
