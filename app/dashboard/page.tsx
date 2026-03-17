@@ -6,11 +6,33 @@ import Link from 'next/link'
 import Sidebar from '../components/Sidebar'
 import styles from './dashboard.module.css'
 
+const FIRMS = [
+  { name: 'Apex Trader Funding', target: 6, drawdown: 6, daily: 1.5 },
+  { name: 'Topstep', target: 6, drawdown: 5, daily: 2 },
+  { name: 'FTMO', target: 10, drawdown: 10, daily: 5 },
+  { name: 'MyFundedFutures', target: 8, drawdown: 5, daily: 2 },
+  { name: 'Take Profit Trader', target: 6, drawdown: 3, daily: 1.5 },
+  { name: 'Custom', target: 0, drawdown: 0, daily: 0 },
+]
+
 export default function Dashboard() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [trades, setTrades] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [showPropModal, setShowPropModal] = useState(false)
+  const [challenges, setChallenges] = useState<any[]>([])
+  const [showAddChallenge, setShowAddChallenge] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [selectedFirm, setSelectedFirm] = useState(FIRMS[0])
+  const [form, setForm] = useState({
+    firm_name: FIRMS[0].name,
+    account_size: '',
+    profit_target: '',
+    max_drawdown: '',
+    daily_loss_limit: '',
+    current_balance: '',
+  })
 
   useEffect(() => {
     const getUser = async () => {
@@ -18,6 +40,7 @@ export default function Dashboard() {
       if (!user) { router.push('/login'); return }
       setUser(user)
       fetchTrades(user.id)
+      fetchChallenges(user.id)
     }
     getUser()
   }, [])
@@ -32,6 +55,77 @@ export default function Dashboard() {
     setLoading(false)
   }
 
+  const fetchChallenges = async (userId: string) => {
+    const { data } = await supabase
+      .from('prop_challenges')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+    setChallenges(data || [])
+  }
+
+  const handleFirmSelect = (firmName: string) => {
+    const firm = FIRMS.find(f => f.name === firmName) || FIRMS[0]
+    setSelectedFirm(firm)
+    const size = parseFloat(form.account_size) || 0
+    setForm(prev => ({
+      ...prev,
+      firm_name: firmName,
+      profit_target: firm.name !== 'Custom' && size ? (size * firm.target / 100).toFixed(2) : '',
+      max_drawdown: firm.name !== 'Custom' && size ? (size * firm.drawdown / 100).toFixed(2) : '',
+      daily_loss_limit: firm.name !== 'Custom' && size ? (size * firm.daily / 100).toFixed(2) : '',
+    }))
+  }
+
+  const handleAccountSize = (val: string) => {
+    const size = parseFloat(val) || 0
+    setForm(prev => ({
+      ...prev,
+      account_size: val,
+      profit_target: selectedFirm.name !== 'Custom' && size ? (size * selectedFirm.target / 100).toFixed(2) : prev.profit_target,
+      max_drawdown: selectedFirm.name !== 'Custom' && size ? (size * selectedFirm.drawdown / 100).toFixed(2) : prev.max_drawdown,
+      daily_loss_limit: selectedFirm.name !== 'Custom' && size ? (size * selectedFirm.daily / 100).toFixed(2) : prev.daily_loss_limit,
+    }))
+  }
+
+  const handleSaveChallenge = async () => {
+    if (!user) return
+    setSaving(true)
+    const size = parseFloat(form.account_size)
+    const { error } = await supabase.from('prop_challenges').insert([{
+      user_id: user.id,
+      firm_name: form.firm_name,
+      account_size: size,
+      profit_target: parseFloat(form.profit_target),
+      max_drawdown: parseFloat(form.max_drawdown),
+      daily_loss_limit: parseFloat(form.daily_loss_limit),
+      current_balance: parseFloat(form.current_balance) || size,
+      starting_balance: size,
+      status: 'active',
+    }])
+    if (!error) {
+      fetchChallenges(user.id)
+      setShowAddChallenge(false)
+      setForm({ firm_name: FIRMS[0].name, account_size: '', profit_target: '', max_drawdown: '', daily_loss_limit: '', current_balance: '' })
+    }
+    setSaving(false)
+  }
+
+  const handleUpdateBalance = async (id: string, newBalance: number) => {
+    await supabase.from('prop_challenges').update({ current_balance: newBalance }).eq('id', id)
+    fetchChallenges(user.id)
+  }
+
+  const handleUpdateStatus = async (id: string, status: string) => {
+    await supabase.from('prop_challenges').update({ status }).eq('id', id)
+    fetchChallenges(user.id)
+  }
+
+  const handleDeleteChallenge = async (id: string) => {
+    await supabase.from('prop_challenges').delete().eq('id', id)
+    fetchChallenges(user.id)
+  }
+
   const closed = trades.filter(t => !t.is_open && t.pnl != null)
   const winners = closed.filter(t => t.pnl > 0)
   const losers = closed.filter(t => t.pnl < 0)
@@ -41,13 +135,11 @@ export default function Dashboard() {
   const avgLoss = losers.length > 0 ? Math.abs(losers.reduce((s, t) => s + t.pnl, 0) / losers.length) : 0
   const profitFactor = avgLoss > 0 ? (avgWin / avgLoss).toFixed(2) : '—'
 
-  // Equity curve for mini chart
   const sorted = [...closed].sort((a, b) => new Date(a.entry_time).getTime() - new Date(b.entry_time).getTime())
   let cum = 0
   const equityCurve = sorted.map(t => { cum += t.pnl; return cum })
   const maxEq = Math.max(...equityCurve.map(Math.abs), 1)
 
-  // Top setups
   const bySetup: Record<string, { pnl: number; count: number; wins: number }> = {}
   closed.forEach(t => {
     const k = t.setup_tag || 'Untagged'
@@ -56,12 +148,9 @@ export default function Dashboard() {
     bySetup[k].count++
     if (t.pnl > 0) bySetup[k].wins++
   })
-  const topSetups = Object.entries(bySetup)
-    .sort((a, b) => b[1].pnl - a[1].pnl)
-    .slice(0, 4)
+  const topSetups = Object.entries(bySetup).sort((a, b) => b[1].pnl - a[1].pnl).slice(0, 4)
   const maxSetupPnl = Math.max(...topSetups.map(s => Math.abs(s[1].pnl)), 1)
 
-  // Last 10 trading days streak
   const dayMap: Record<string, number> = {}
   closed.forEach(t => {
     const d = new Date(t.entry_time).toDateString()
@@ -69,8 +158,7 @@ export default function Dashboard() {
   })
   const recentDays = Object.entries(dayMap)
     .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime())
-    .slice(0, 14)
-    .reverse()
+    .slice(0, 14).reverse()
 
   if (loading) {
     return (
@@ -84,9 +172,202 @@ export default function Dashboard() {
   return (
     <div className={styles.layout}>
       <Sidebar userEmail={user?.email || ''} />
-      <main className={styles.main}>
 
-        {/* Top Bar */}
+      {/* Prop Firm Modal */}
+      {showPropModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowPropModal(false)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>🏆 Prop Firm Tracker</h2>
+              <button onClick={() => setShowPropModal(false)} className={styles.modalClose}>✕</button>
+            </div>
+
+            {/* Active Challenges */}
+            {challenges.length > 0 && (
+              <div className={styles.challengesList}>
+                {challenges.map(c => {
+                  const profit = c.current_balance - c.starting_balance
+                  const profitPct = (profit / c.account_size) * 100
+                  const drawdownPct = ((c.starting_balance - c.current_balance) / c.account_size) * 100
+                  const targetPct = (c.profit_target / c.account_size) * 100
+                  const drawdownLimitPct = (c.max_drawdown / c.account_size) * 100
+                  const profitProgress = Math.min((profit / c.profit_target) * 100, 100)
+                  const drawdownProgress = Math.min((Math.max(0, -profit) / c.max_drawdown) * 100, 100)
+                  const isPassing = profit >= 0
+                  const hasFailed = drawdownProgress >= 100
+                  const hasPassed = profitProgress >= 100
+
+                  return (
+                    <div key={c.id} className={`${styles.challengeCard} ${hasFailed ? styles.challengeFailed : hasPassed ? styles.challengePassed : ''}`}>
+                      <div className={styles.challengeHeader}>
+                        <div>
+                          <span className={styles.challengeFirm}>{c.firm_name}</span>
+                          <span className={styles.challengeSize}>${c.account_size.toLocaleString()} account</span>
+                        </div>
+                        <div className={styles.challengeHeaderRight}>
+                          <span className={`${styles.challengeStatus} ${hasFailed ? styles.statusFailed : hasPassed ? styles.statusPassed : styles.statusActive}`}>
+                            {hasFailed ? '❌ FAILED' : hasPassed ? '✅ PASSED' : '🔄 ACTIVE'}
+                          </span>
+                          <button onClick={() => handleDeleteChallenge(c.id)} className={styles.challengeDeleteBtn}>✕</button>
+                        </div>
+                      </div>
+
+                      {/* Profit Progress */}
+                      <div className={styles.challengeMetric}>
+                        <div className={styles.challengeMetricTop}>
+                          <span className={styles.challengeMetricLabel}>Profit Target</span>
+                          <span className={`${styles.challengeMetricValue} ${profit >= 0 ? styles.green : styles.red}`}>
+                            {profit >= 0 ? '+' : ''}${profit.toFixed(2)} / ${c.profit_target.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className={styles.challengeBar}>
+                          <div
+                            className={`${styles.challengeBarFill} ${styles.barGreen}`}
+                            style={{ width: `${Math.max(0, profitProgress)}%` }}
+                          />
+                        </div>
+                        <span className={styles.challengeMetricSub}>
+                          {profitProgress.toFixed(1)}% of target reached
+                        </span>
+                      </div>
+
+                      {/* Drawdown */}
+                      <div className={styles.challengeMetric}>
+                        <div className={styles.challengeMetricTop}>
+                          <span className={styles.challengeMetricLabel}>Max Drawdown</span>
+                          <span className={`${styles.challengeMetricValue} ${drawdownProgress > 75 ? styles.red : styles.green}`}>
+                            ${Math.max(0, -profit).toFixed(2)} / ${c.max_drawdown.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className={styles.challengeBar}>
+                          <div
+                            className={`${styles.challengeBarFill} ${drawdownProgress > 75 ? styles.barRed : drawdownProgress > 50 ? styles.barAmber : styles.barGreen}`}
+                            style={{ width: `${drawdownProgress}%` }}
+                          />
+                        </div>
+                        <span className={styles.challengeMetricSub}>
+                          {drawdownProgress.toFixed(1)}% of max drawdown used
+                        </span>
+                      </div>
+
+                      {/* Update Balance */}
+                      <div className={styles.challengeUpdate}>
+                        <span className={styles.challengeMetricLabel}>Update Current Balance</span>
+                        <div className={styles.challengeUpdateRow}>
+                          <input
+                            type="number"
+                            step="0.01"
+                            defaultValue={c.current_balance}
+                            className={styles.challengeInput}
+                            id={`balance-${c.id}`}
+                            placeholder="Current balance"
+                          />
+                          <button
+                            onClick={() => {
+                              const input = document.getElementById(`balance-${c.id}`) as HTMLInputElement
+                              handleUpdateBalance(c.id, parseFloat(input.value))
+                            }}
+                            className={styles.challengeUpdateBtn}
+                          >
+                            Update
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Add Challenge Form */}
+            {showAddChallenge ? (
+              <div className={styles.addChallengeForm}>
+                <h3 className={styles.addChallengeTitle}>Add New Challenge</h3>
+
+                <div className={styles.formField}>
+                  <label className={styles.formLabel}>Prop Firm</label>
+                  <select
+                    value={form.firm_name}
+                    onChange={e => handleFirmSelect(e.target.value)}
+                    className={styles.formSelect}
+                  >
+                    {FIRMS.map(f => <option key={f.name}>{f.name}</option>)}
+                  </select>
+                </div>
+
+                <div className={styles.formGrid2}>
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel}>Account Size ($)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 50000"
+                      value={form.account_size}
+                      onChange={e => handleAccountSize(e.target.value)}
+                      className={styles.formInput}
+                    />
+                  </div>
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel}>Current Balance ($)</label>
+                    <input
+                      type="number"
+                      placeholder="Same as account size if just starting"
+                      value={form.current_balance}
+                      onChange={e => setForm(prev => ({ ...prev, current_balance: e.target.value }))}
+                      className={styles.formInput}
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formGrid3}>
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel}>Profit Target ($)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 3000"
+                      value={form.profit_target}
+                      onChange={e => setForm(prev => ({ ...prev, profit_target: e.target.value }))}
+                      className={styles.formInput}
+                    />
+                  </div>
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel}>Max Drawdown ($)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 3000"
+                      value={form.max_drawdown}
+                      onChange={e => setForm(prev => ({ ...prev, max_drawdown: e.target.value }))}
+                      className={styles.formInput}
+                    />
+                  </div>
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel}>Daily Loss Limit ($)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 750"
+                      value={form.daily_loss_limit}
+                      onChange={e => setForm(prev => ({ ...prev, daily_loss_limit: e.target.value }))}
+                      className={styles.formInput}
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.formActions}>
+                  <button onClick={() => setShowAddChallenge(false)} className={styles.btnGhost}>Cancel</button>
+                  <button onClick={handleSaveChallenge} className={styles.btnPrimary} disabled={saving}>
+                    {saving ? 'Saving...' : '💾 Save Challenge'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setShowAddChallenge(true)} className={styles.addChallengeBtn}>
+                + Add New Challenge
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <main className={styles.main}>
         <div className={styles.topBar}>
           <div className={styles.topBarLeft}>
             <span className={styles.pageTitle}>Dashboard</span>
@@ -94,12 +375,20 @@ export default function Dashboard() {
               {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </span>
           </div>
-          <Link href="/dashboard/add-trade" className={styles.btnPrimary}>+ Log Trade</Link>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button onClick={() => setShowPropModal(true)} className={styles.btnPropFirm}>
+              🏆 Prop Firm
+              {challenges.filter(c => {
+                const profit = c.current_balance - c.starting_balance
+                const drawdownProgress = Math.max(0, -profit) / c.max_drawdown * 100
+                return drawdownProgress > 75
+              }).length > 0 && <span className={styles.alertDot} />}
+            </button>
+            <Link href="/dashboard/add-trade" className={styles.btnPrimary}>+ Log Trade</Link>
+          </div>
         </div>
 
         <div className={styles.content}>
-
-          {/* P&L Hero */}
           <div className={styles.pnlHero}>
             <div className={styles.pnlHeroLeft}>
               <span className={styles.pnlHeroLabel}>All Time P&L</span>
@@ -131,7 +420,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Stats Grid */}
           <div className={styles.statsGrid}>
             {[
               { icon: '💰', label: 'Avg Winner', value: `$${avgWin.toFixed(2)}`, sub: 'Per winning trade', color: 'green' },
@@ -148,10 +436,7 @@ export default function Dashboard() {
             ))}
           </div>
 
-          {/* Two col: equity curve + top setups */}
           <div className={styles.twoCol}>
-
-            {/* Equity Curve */}
             <div className={styles.sectionCard}>
               <div className={styles.sectionHead}>
                 <span className={styles.sectionLabel}>Equity Curve</span>
@@ -176,7 +461,6 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Top Setups */}
             <div className={styles.sectionCard}>
               <div className={styles.sectionHead}>
                 <span className={styles.sectionLabel}>Top Setups</span>
@@ -214,7 +498,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Day Streak */}
           {recentDays.length > 0 && (
             <div className={styles.sectionCard}>
               <div className={styles.sectionHead}>
@@ -234,7 +517,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Recent Trades */}
           <div className={styles.sectionCard}>
             <div className={styles.sectionHead}>
               <span className={styles.sectionLabel}>Recent Trades</span>
@@ -269,7 +551,6 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-
         </div>
       </main>
     </div>

@@ -485,3 +485,407 @@
     font-size: 20px;
   }
 }
+
+/* PROP FIRM BUTTON */
+.btnPropFirm {
+  background: rgba(108,99,255,0.12);
+  color: var(--accent);
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid rgba(108,99,255,0.3);
+  transition: all 0.2s;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btnPropFirm:hover {
+  background: rgba(108,99,255,0.2);
+  border-color: var(--accent);
+}
+
+.alertDot {
+  width: 8px;
+  height: 8px;
+  background: var(--accent-red);
+  border-radius: 50%;
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.2); }
+}
+
+/* MODAL */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 28px;
+  width: 100%;
+  max-width: 620px;
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modalTitle {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+.modalClose {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.modalClose:hover {
+  background: rgba(255,71,87,0.1);
+  color: var(--accent-red);
+}
+
+/* CHALLENGES */
+.challengesList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.challengeCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: border-color 0.2s;
+}
+
+.challengeFailed {
+  border-color: rgba(255,71,87,0.4);
+  background: rgba(255,71,87,0.04);
+}
+
+.challengePassed {
+  border-color: rgba(0,212,170,0.4);
+  background: rgba(0,212,170,0.04);
+}
+
+.challengeHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.challengeHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.challengeFirm {
+  font-size: 15px;
+  font-weight: 800;
+  display: block;
+}
+
+.challengeSize {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.challengeStatus {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.3px;
+}
+
+.statusActive {
+  background: rgba(108,99,255,0.12);
+  color: var(--accent);
+}
+
+.statusPassed {
+  background: rgba(0,212,170,0.12);
+  color: var(--accent-green);
+}
+
+.statusFailed {
+  background: rgba(255,71,87,0.12);
+  color: var(--accent-red);
+}
+
+.challengeDeleteBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.challengeDeleteBtn:hover {
+  color: var(--accent-red);
+  background: rgba(255,71,87,0.1);
+}
+
+.challengeMetric {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.challengeMetricTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.challengeMetricLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.challengeMetricValue {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.challengeMetricSub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.challengeBar {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-card);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.challengeBarFill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.barGreen { background: var(--accent-green); }
+.barAmber { background: var(--accent-amber); }
+.barRed { background: var(--accent-red); }
+
+.challengeUpdate {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.challengeUpdateRow {
+  display: flex;
+  gap: 8px;
+}
+
+.challengeInput {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: border-color 0.2s;
+}
+
+.challengeInput:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.challengeUpdateBtn {
+  background: var(--accent);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.challengeUpdateBtn:hover { background: var(--accent-hover); }
+
+/* ADD CHALLENGE FORM */
+.addChallengeForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.addChallengeTitle {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.formInput {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text-primary);
+  transition: border-color 0.2s;
+  width: 100%;
+}
+
+.formInput:focus { border-color: var(--accent); outline: none; }
+.formInput::placeholder { color: var(--text-muted); }
+
+.formSelect {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text-primary);
+  width: 100%;
+  cursor: pointer;
+}
+
+.formSelect:focus { border-color: var(--accent); outline: none; }
+
+.formGrid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.formGrid3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.formActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.btnGhost {
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btnGhost:hover {
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+  background: var(--bg-hover);
+}
+
+.addChallengeBtn {
+  background: transparent;
+  border: 2px dashed var(--border);
+  color: var(--text-muted);
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.addChallengeBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(108,99,255,0.04);
+}
