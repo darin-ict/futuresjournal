@@ -265,3 +265,32 @@
   font-weight: 500;
   color: var(--text-muted);
 }
+
+@media (max-width: 768px) {
+  .main {
+    margin-left: 0;
+    max-width: 100vw;
+    padding-bottom: 70px;
+  }
+
+  .topBar {
+    padding: 16px 20px;
+  }
+
+  .content {
+    padding: 16px 20px;
+    gap: 16px;
+  }
+
+  .twoCol {
+    grid-template-columns: 1fr;
+  }
+
+  .summaryGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .rulesPreview {
+    grid-template-columns: 1fr 1fr;
+  }
+}
