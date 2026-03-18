@@ -590,3 +590,27 @@
   .instCell { font-size: 16px; font-weight: 800; }
   .priceCell { font-size: 13px; }
 }
+
+.popupActionsRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.shareBtn {
+  background: rgba(108,99,255,0.12);
+  color: var(--accent);
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(108,99,255,0.3);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-weight: 600;
+}
+
+.shareBtn:hover {
+  background: rgba(108,99,255,0.2);
+  border-color: var(--accent);
+}

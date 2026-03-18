@@ -153,16 +153,29 @@ export default function TradeLog() {
             )}
 
             <div className={styles.popupActions}>
-              {deleteId === selectedTrade.id ? (
-                <div className={styles.confirmDelete}>
-                  <button onClick={() => handleDelete(selectedTrade.id)} className={styles.confirmYes}>Confirm Delete</button>
-                  <button onClick={() => setDeleteId(null)} className={styles.confirmNo}>Cancel</button>
-                </div>
-              ) : (
-                <button onClick={() => setDeleteId(selectedTrade.id)} className={styles.popupDeleteBtn}>
-                  🗑️ Delete Trade
+              <div className={styles.popupActionsRow}>
+                <button
+                  onClick={async () => {
+                    await supabase.from('trades').update({ is_public: true }).eq('id', selectedTrade.id)
+                    const url = `${window.location.origin}/share/${selectedTrade.id}`
+                    navigator.clipboard.writeText(url)
+                    alert('Share link copied to clipboard! 🔗')
+                  }}
+                  className={styles.shareBtn}
+                >
+                  🔗 Share Trade
                 </button>
-              )}
+                {deleteId === selectedTrade.id ? (
+                  <div className={styles.confirmDelete}>
+                    <button onClick={() => handleDelete(selectedTrade.id)} className={styles.confirmYes}>Confirm Delete</button>
+                    <button onClick={() => setDeleteId(null)} className={styles.confirmNo}>Cancel</button>
+                  </div>
+                ) : (
+                  <button onClick={() => setDeleteId(selectedTrade.id)} className={styles.popupDeleteBtn}>
+                    🗑️ Delete
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
