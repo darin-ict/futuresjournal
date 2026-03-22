@@ -135,7 +135,7 @@ Keep each section concise but impactful. Use the exact numbers from the data. Th
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -145,7 +145,8 @@ Keep each section concise but impactful. Use the exact numbers from the data. Th
     const report = data.content[0].text
 
     return NextResponse.json({ report })
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to generate report' }, { status: 500 })
+  } catch (error: any) {
+    console.error('AI Coach error:', error)
+    return NextResponse.json({ error: error.message || 'Failed to generate report' }, { status: 500 })
   }
 }
