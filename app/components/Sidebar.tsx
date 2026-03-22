@@ -15,13 +15,14 @@ export default function Sidebar({ userEmail }: { userEmail: string }) {
     router.push('/')
   }
 
-  const links = [
+    const links = [
     { href: '/dashboard', icon: '📊', label: 'Dashboard' },
     { href: '/dashboard/trades', icon: '📓', label: 'Trade Log' },
     { href: '/dashboard/add-trade', icon: '➕', label: 'Add Trade' },
     { href: '/dashboard/analytics', icon: '📈', label: 'Analytics' },
     { href: '/dashboard/playbook', icon: '📋', label: 'Playbook' },
     { href: '/dashboard/risk', icon: '🛡️', label: 'Risk Rules' },
+    { href: '/dashboard/ai-coach', icon: '🤖', label: 'AI Coach' },
     { href: '/dashboard/settings', icon: '⚙️', label: 'Settings' },
   ]
 

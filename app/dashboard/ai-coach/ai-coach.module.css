@@ -1,0 +1,347 @@
+.loadingScreen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--text-secondary);
+}
+
+.loadingSpinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.layout {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg-primary);
+}
+
+.main {
+  flex: 1;
+  margin-left: 240px;
+  max-width: calc(100vw - 240px);
+  display: flex;
+  flex-direction: column;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 40px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg-primary);
+  backdrop-filter: blur(12px);
+  z-index: 10;
+}
+
+.topBarLeft { display: flex; flex-direction: column; gap: 2px; }
+.pageTitle { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+.pageSubtitle { font-size: 13px; color: var(--text-muted); }
+
+.content {
+  padding: 28px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 860px;
+}
+
+/* ANALYZE CARD */
+.analyzeCard {
+  background: var(--bg-card);
+  border: 1px solid rgba(108,99,255,0.3);
+  border-radius: 20px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: linear-gradient(135deg, rgba(108,99,255,0.08) 0%, rgba(108,99,255,0.02) 100%);
+}
+
+.analyzeCardLeft {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.analyzeIcon {
+  font-size: 40px;
+  flex-shrink: 0;
+}
+
+.analyzeTitle {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  margin-bottom: 8px;
+}
+
+.analyzeSub {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.analyzeActions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.btnAnalyze {
+  background: var(--accent);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  white-space: nowrap;
+}
+
+.btnAnalyze:hover { background: var(--accent-hover); transform: translateY(-1px); }
+.btnAnalyze:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+
+.analyzingText {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.analyzeSpinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.btnGhost {
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btnGhost:hover {
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+  background: var(--bg-hover);
+}
+
+.strategyInput {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.strategyLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.strategyTextarea {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--text-primary);
+  width: 100%;
+  resize: vertical;
+  line-height: 1.6;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.strategyTextarea:focus { border-color: var(--accent); outline: none; }
+.strategyTextarea::placeholder { color: var(--text-muted); }
+
+.error {
+  background: rgba(255,71,87,0.1);
+  border: 1px solid rgba(255,71,87,0.3);
+  color: var(--accent-red);
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+/* REPORT */
+.reportCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.reportHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 24px 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  gap: 16px;
+}
+
+.reportTitle {
+  font-size: 18px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.reportSubtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.reportBody {
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.reportSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.reportSection:last-child { border-bottom: none; padding-bottom: 0; }
+
+.reportSectionTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.reportSectionContent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reportParagraph {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin: 0;
+}
+
+.reportBullet {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin: 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--accent);
+}
+
+/* PAST REPORTS */
+.pastReports {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pastReportsTitle {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.pastReportsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pastReportCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.pastReportCard:hover {
+  border-color: var(--accent);
+  background: rgba(108,99,255,0.04);
+}
+
+.pastReportLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.pastReportIcon { font-size: 20px; }
+
+.pastReportDate {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.pastReportTrades {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.pastReportArrow {
+  color: var(--accent);
+  font-size: 16px;
+}
+
+/* EMPTY */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 80px 20px;
+  text-align: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.emptyIcon { font-size: 52px; }
+.emptyState h3 { font-size: 20px; font-weight: 700; }
+.emptyState p { font-size: 14px; color: var(--text-secondary); }
