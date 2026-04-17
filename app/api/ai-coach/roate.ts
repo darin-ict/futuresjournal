@@ -126,27 +126,35 @@ Which setups are making money and which aren't. What they should focus on.
 
 Keep each section concise but impactful. Use the exact numbers from the data. This trader needs real talk, not encouragement fluff.`
 
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY!,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    })
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY!,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2000,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  })
 
-    const data = await response.json()
-    const report = data.content[0].text
+  const data = await response.json()
 
-    return NextResponse.json({ report })
-  } catch (error: any) {
-    console.error('AI Coach error:', error)
-    return NextResponse.json({ error: error.message || 'Failed to generate report' }, { status: 500 })
+  if (!response.ok) {
+    return NextResponse.json({ 
+      error: `API Error: ${data.error?.message || JSON.stringify(data)}` 
+    }, { status: 500 })
   }
+
+  if (!data.content || !data.content[0]) {
+    return NextResponse.json({ 
+      error: `Unexpected response: ${JSON.stringify(data)}` 
+    }, { status: 500 })
+  }
+
+  const report = data.content[0].text
+
+  return NextResponse.json({ report })
 }

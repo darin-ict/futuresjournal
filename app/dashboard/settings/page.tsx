@@ -22,6 +22,16 @@ export default function Settings() {
   const [passSaved, setPassSaved] = useState(false)
   const [passError, setPassError] = useState('')
 
+  // Tradovate connection
+  const [tradovateConn, setTradovateConn] = useState<any>(null)
+  const [tvUsername, setTvUsername] = useState('')
+  const [tvPassword, setTvPassword] = useState('')
+  const [tvDemo, setTvDemo] = useState(true)
+  const [tvConnecting, setTvConnecting] = useState(false)
+  const [tvSyncing, setTvSyncing] = useState(false)
+  const [tvMessage, setTvMessage] = useState('')
+  const [tvError, setTvError] = useState('')
+
   const [csvText, setCsvText] = useState('')
   const [importing, setImporting] = useState(false)
   const [importResults, setImportResults] = useState<{
@@ -41,6 +51,7 @@ export default function Settings() {
         .eq('id', user.id)
         .single()
       if (profile?.full_name) setFullName(profile.full_name)
+      fetchTradovateConnection(user.id)
       setLoading(false)
     }
     getUser()
@@ -75,6 +86,78 @@ export default function Settings() {
       setTimeout(() => setPassSaved(false), 3000)
     }
     setPassSaving(false)
+  }
+
+  const fetchTradovateConnection = async (userId: string) => {
+    const { data } = await supabase
+      .from('tradovate_connections')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+    setTradovateConn(data)
+  }
+
+  const handleTradovateConnect = async () => {
+    if (!user || !tvUsername || !tvPassword) return
+    setTvConnecting(true)
+    setTvError('')
+    setTvMessage('')
+
+    const res = await fetch('/api/tradovate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'connect',
+        userId: user.id,
+        username: tvUsername,
+        password: tvPassword,
+        isDemo: tvDemo,
+      }),
+    })
+
+    const data = await res.json()
+
+    if (data.error) {
+      setTvError(data.error)
+    } else {
+      setTvMessage(`✓ Connected to ${data.accountName}`)
+      fetchTradovateConnection(user.id)
+    }
+    setTvConnecting(false)
+  }
+
+  const handleTradovateSync = async () => {
+    if (!user) return
+    setTvSyncing(true)
+    setTvMessage('')
+    setTvError('')
+
+    const res = await fetch('/api/tradovate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'sync', userId: user.id }),
+    })
+
+    const data = await res.json()
+
+    if (data.error) {
+      setTvError(data.error)
+    } else {
+      setTvMessage(`✓ ${data.message}`)
+      fetchTradovateConnection(user.id)
+    }
+    setTvSyncing(false)
+  }
+
+  const handleTradovateDisconnect = async () => {
+    if (!user) return
+    await fetch('/api/tradovate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'disconnect', userId: user.id }),
+    })
+    setTradovateConn(null)
+    setTvMessage('')
   }
 
   const parseTradovateCSV = (text: string) => {
@@ -252,6 +335,54 @@ export default function Settings() {
                 {passSaving ? 'Saving...' : passSaved ? '✓ Password Updated!' : 'Update Password'}
               </button>
             </form>
+          </div>
+
+          <div className={styles.card}>
+            <h2 className={styles.cardTitle}>⚡ Tradovate Auto Sync</h2>
+            {tradovateConn ? (
+              <div className={styles.connectedBox}>
+                <div className={styles.connectedHeader}>
+                  <div>
+                    <span className={styles.connectedBadge}>✓ Connected</span>
+                    <p className={styles.connectedAccount}>{tradovateConn.account_name}</p>
+                    <p className={styles.connectedMeta}>
+                      {tradovateConn.is_demo ? 'Demo account' : 'Live account'} •
+                      {tradovateConn.last_synced_at ? ` Last synced ${new Date(tradovateConn.last_synced_at).toLocaleString()}` : ' Never synced'}
+                    </p>
+                  </div>
+                  <button onClick={handleTradovateDisconnect} className={styles.disconnectBtn}>Disconnect</button>
+                </div>
+                {tvMessage && <div className={styles.successMsg}>{tvMessage}</div>}
+                {tvError && <div className={styles.error}>{tvError}</div>}
+                <button onClick={handleTradovateSync} className={styles.btnPrimary} disabled={tvSyncing}>
+                  {tvSyncing ? '⏳ Syncing...' : '🔄 Sync Trades Now'}
+                </button>
+              </div>
+            ) : (
+              <div className={styles.form}>
+                <p className={styles.fieldHint}>Connect your Tradovate account to automatically import trades. Your credentials are stored securely.</p>
+                <div className={styles.field}>
+                  <label className={styles.label}>Account Type</label>
+                  <div className={styles.toggleRow}>
+                    <button type="button" onClick={() => setTvDemo(true)} className={tvDemo ? styles.toggleActive : styles.toggleInactive}>Demo / Sim</button>
+                    <button type="button" onClick={() => setTvDemo(false)} className={!tvDemo ? styles.toggleActive : styles.toggleInactive}>Live</button>
+                  </div>
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label}>Tradovate Username</label>
+                  <input type="text" value={tvUsername} onChange={e => setTvUsername(e.target.value)} placeholder="Your Tradovate username" className={styles.input} />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label}>Tradovate Password</label>
+                  <input type="password" value={tvPassword} onChange={e => setTvPassword(e.target.value)} placeholder="Your Tradovate password" className={styles.input} />
+                </div>
+                {tvError && <div className={styles.error}>{tvError}</div>}
+                {tvMessage && <div className={styles.successMsg}>{tvMessage}</div>}
+                <button onClick={handleTradovateConnect} className={styles.btnPrimary} disabled={tvConnecting || !tvUsername || !tvPassword}>
+                  {tvConnecting ? 'Connecting...' : '⚡ Connect Tradovate'}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className={styles.card}>
