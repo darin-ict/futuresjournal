@@ -68,8 +68,8 @@ export default function AICoach() {
       }])
 
       fetchData(user.id)
-    } catch (err) {
-      setError('Something went wrong. Try again.')
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong. Try again.')
     }
 
     setAnalyzing(false)

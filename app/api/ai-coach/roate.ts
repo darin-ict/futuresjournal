@@ -134,27 +134,29 @@ Keep each section concise but impactful. Use the exact numbers from the data. Th
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-opus-4-6',
       max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }],
     }),
   })
 
   const data = await response.json()
+  console.log('Anthropic response status:', response.status)
+  console.log('Anthropic response:', JSON.stringify(data).slice(0, 500))
 
   if (!response.ok) {
-    return NextResponse.json({ 
-      error: `API Error: ${data.error?.message || JSON.stringify(data)}` 
+    return NextResponse.json({
+      error: `Anthropic API error ${response.status}: ${data.error?.message || JSON.stringify(data)}`
     }, { status: 500 })
   }
 
-  if (!data.content || !data.content[0]) {
-    return NextResponse.json({ 
-      error: `Unexpected response: ${JSON.stringify(data)}` 
+  const report = data.content?.[0]?.text
+  if (!report) {
+    return NextResponse.json({
+      error: `No content in response: ${JSON.stringify(data)}`
     }, { status: 500 })
   }
 
-  const report = data.content[0].text
-
+  // Save report to database
   return NextResponse.json({ report })
-}
+  }

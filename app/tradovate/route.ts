@@ -11,7 +11,7 @@ const DEMO_URL = 'https://demo.tradovateapi.com/v1'
 async function getTradovateToken(username: string, password: string, isDemo: boolean) {
   const baseUrl = isDemo ? DEMO_URL : 'https://live.tradovateapi.com/v1'
   
-  const res = await fetch(`${baseUrl}/auth/accesstokenrequest`, {
+  const res = await fetch(`${baseUrl}/auth/accessTokenRequest`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
