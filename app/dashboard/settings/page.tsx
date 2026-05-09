@@ -199,26 +199,30 @@ export default function Settings() {
       let entryTime = new Date().toISOString()
 
       if (row['datestart']) {
-        const parsed = new Date(
-          row['datestart'].replace(' ', 'T')
-        )
+  const normalized = row['datestart']
+    .replace(/\//g, '-')
+    .replace(' ', 'T')
 
-        if (!isNaN(parsed.getTime())) {
-          entryTime = parsed.toISOString()
-        }
-      }
+  const parsed = new Date(normalized)
+
+  if (!isNaN(parsed.getTime())) {
+    entryTime = parsed.toISOString()
+  }
+}
 
       let exitTime: string | null = null
 
       if (row['dateend']) {
-        const parsed = new Date(
-          row['dateend'].replace(' ', 'T')
-        )
+  const normalized = row['dateend']
+    .replace(/\//g, '-')
+    .replace(' ', 'T')
 
-        if (!isNaN(parsed.getTime())) {
-          exitTime = parsed.toISOString()
-        }
-      }
+  const parsed = new Date(normalized)
+
+  if (!isNaN(parsed.getTime())) {
+    exitTime = parsed.toISOString()
+  }
+}
 
       return {
         instrument,
