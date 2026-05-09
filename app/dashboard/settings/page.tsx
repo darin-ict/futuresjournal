@@ -22,7 +22,6 @@ export default function Settings() {
   const [passSaved, setPassSaved] = useState(false)
   const [passError, setPassError] = useState('')
 
-  // Tradovate connection
   const [tradovateConn, setTradovateConn] = useState<any>(null)
   const [tvUsername, setTvUsername] = useState('')
   const [tvPassword, setTvPassword] = useState('')
@@ -102,27 +101,14 @@ export default function Settings() {
     setTvConnecting(true)
     setTvError('')
     setTvMessage('')
-
     const res = await fetch('/api/tradovate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'connect',
-        userId: user.id,
-        username: tvUsername,
-        password: tvPassword,
-        isDemo: tvDemo,
-      }),
+      body: JSON.stringify({ action: 'connect', userId: user.id, username: tvUsername, password: tvPassword, isDemo: tvDemo }),
     })
-
     const data = await res.json()
-
-    if (data.error) {
-      setTvError(data.error)
-    } else {
-      setTvMessage(`✓ Connected to ${data.accountName}`)
-      fetchTradovateConnection(user.id)
-    }
+    if (data.error) { setTvError(data.error) }
+    else { setTvMessage(`✓ Connected to ${data.accountName}`); fetchTradovateConnection(user.id) }
     setTvConnecting(false)
   }
 
@@ -131,21 +117,14 @@ export default function Settings() {
     setTvSyncing(true)
     setTvMessage('')
     setTvError('')
-
     const res = await fetch('/api/tradovate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'sync', userId: user.id }),
     })
-
     const data = await res.json()
-
-    if (data.error) {
-      setTvError(data.error)
-    } else {
-      setTvMessage(`✓ ${data.message}`)
-      fetchTradovateConnection(user.id)
-    }
+    if (data.error) { setTvError(data.error) }
+    else { setTvMessage(`✓ ${data.message}`); fetchTradovateConnection(user.id) }
     setTvSyncing(false)
   }
 
@@ -158,18 +137,6 @@ export default function Settings() {
     })
     setTradovateConn(null)
     setTvMessage('')
-  }
-
-  const parseTradovateCSV = (text: string) => {
-    const lines = text.trim().split('\n')
-    if (lines.length < 2) return []
-    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, '').toLowerCase())
-    return lines.slice(1).map(line => {
-      const values = line.split(',').map(v => v.trim().replace(/"/g, ''))
-      const row: Record<string, string> = {}
-      headers.forEach((h, i) => { row[h] = values[i] || '' })
-      return row
-    }).filter(row => Object.values(row).some(v => v !== ''))
   }
 
   const parsePnl = (raw: string): number => {
@@ -190,78 +157,106 @@ export default function Settings() {
     return s.replace(/[A-Z]\d+$/, '') || s
   }
 
+  const parseFXReplayRows = (rows: Record<string, string>[]) => {
+    const pairMap: Record<string, string> = {
+      USATECHIDXUSD: 'NQ',
+      USAIDXUSD: 'ES',
+      USOILUSD: 'CL',
+      XAUUSD: 'GC',
+      XAGUSD: 'SI',
+    }
+    return rows.map(row => {
+      const pair = (row['pair'] || '').toUpperCase()
+      const instrument = pairMap[pair] || pair
+      const direction = (row['side'] || '').toLowerCase() === 'buy' ? 'LONG' : 'SHORT'
+      const entryPrice = parseFloat(row['entryprice'] || '0')
+      const exitPrice = parseFloat(row['avgcloseprice'] || '0')
+      const pnl = parseFloat(row['rpnl'] || '0')
+      const contracts = Math.round(parseFloat(row['amount'] || '1')) || 1
+      const entryTime = row['datestart'] ? new Date(row['datestart'].replace(' ', 'T')).toISOString() : new Date().toISOString()
+      const exitTime = row['dateend'] ? new Date(row['dateend'].replace(' ', 'T')).toISOString() : null
+      const setupTag = row['tags'] || null
+      const status = row['status'] || ''
+      if (!entryPrice || !exitPrice || status !== 'closed') return null
+      return { instrument, direction, entry_price: entryPrice, exit_price: exitPrice, pnl, contracts, entry_time: entryTime, exit_time: exitTime, setup_tag: setupTag }
+    }).filter(Boolean)
+  }
+
   const handleImport = async () => {
     if (!user || !csvText.trim()) return
     setImporting(true)
     setImportResults(null)
 
-    const rows = parseTradovateCSV(csvText)
-    if (rows.length === 0) {
-      setImportResults({ success: 0, skipped: 0, errors: ['No valid rows found. Make sure you pasted the full CSV including the header row.'] })
+    const lines = csvText.trim().split('\n')
+    if (lines.length < 2) {
+      setImportResults({ success: 0, skipped: 0, errors: ['No valid rows found.'] })
+      setImporting(false)
+      return
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, '').toLowerCase())
+    const rows = lines.slice(1).map(line => {
+      const values = line.split(',').map(v => v.trim().replace(/"/g, ''))
+      const row: Record<string, string> = {}
+      headers.forEach((h, i) => { row[h] = values[i] || '' })
+      return row
+    }).filter(row => Object.values(row).some(v => v !== ''))
+
+    const isFXReplay = headers.includes('datestart') || headers.includes('rpnl')
+    const isTradovate = headers.includes('buyprice') || headers.includes('boughttimestamp')
+
+    let tradesToInsert: any[] = []
+    let skipped = 0
+    const errors: string[] = []
+
+    if (isFXReplay) {
+      const parsed = parseFXReplayRows(rows)
+      tradesToInsert = parsed.filter(Boolean)
+      skipped = rows.length - tradesToInsert.length
+    } else if (isTradovate) {
+      for (const row of rows) {
+        try {
+          const symbol = row['symbol'] || ''
+          const qty = parseInt(row['qty'] || '1')
+          const buyPrice = parseFloat(row['buyprice'] || '0')
+          const sellPrice = parseFloat(row['sellprice'] || '0')
+          const pnlRaw = row['pnl'] || '0'
+          const boughtTs = row['boughttimestamp'] || ''
+          const soldTs = row['soldtimestamp'] || ''
+          const buyFillId = row['buyfillid'] || '0'
+          const sellFillId = row['sellfillid'] || '0'
+          if (!symbol || !buyPrice || !sellPrice) { skipped++; continue }
+          const base = getBase(symbol)
+          const pnl = parsePnl(pnlRaw)
+          const direction = parseInt(buyFillId) < parseInt(sellFillId) ? 'LONG' : 'SHORT'
+          const entryPrice = direction === 'LONG' ? buyPrice : sellPrice
+          const exitPrice = direction === 'LONG' ? sellPrice : buyPrice
+          let entryTime = new Date().toISOString()
+          const entryTsRaw = direction === 'LONG' ? boughtTs : soldTs
+          if (entryTsRaw) { const p = new Date(entryTsRaw); if (!isNaN(p.getTime())) entryTime = p.toISOString() }
+          let exitTime = null
+          const exitTsRaw = direction === 'LONG' ? soldTs : boughtTs
+          if (exitTsRaw) { const p = new Date(exitTsRaw); if (!isNaN(p.getTime())) exitTime = p.toISOString() }
+          tradesToInsert.push({ instrument: base, direction, entry_price: entryPrice, exit_price: exitPrice, contracts: qty || 1, entry_time: entryTime, exit_time: exitTime, pnl, is_open: false })
+        } catch { skipped++ }
+      }
+    } else {
+      setImportResults({ success: 0, skipped: rows.length, errors: ['Unknown CSV format. Supported: Tradovate, FXReplay'] })
       setImporting(false)
       return
     }
 
     let success = 0
-    let skipped = 0
-    const errors: string[] = []
-
-    for (const row of rows) {
-      try {
-        const symbol = row['symbol'] || ''
-        const qty = parseInt(row['qty'] || '1')
-        const buyPrice = parseFloat(row['buyprice'] || '0')
-        const sellPrice = parseFloat(row['sellprice'] || '0')
-        const pnlRaw = row['pnl'] || '0'
-        const boughtTs = row['boughttimestamp'] || ''
-        const soldTs = row['soldtimestamp'] || ''
-        const buyFillId = row['buyfillid'] || '0'
-        const sellFillId = row['sellfillid'] || '0'
-
-        if (!symbol || !buyPrice || !sellPrice) { skipped++; continue }
-
-        const base = getBase(symbol)
-        const pnl = parsePnl(pnlRaw)
-
-        // If buyFillId < sellFillId, bought first = LONG, else SHORT
-        const direction = parseInt(buyFillId) < parseInt(sellFillId) ? 'LONG' : 'SHORT'
-        const entryPrice = direction === 'LONG' ? buyPrice : sellPrice
-        const exitPrice = direction === 'LONG' ? sellPrice : buyPrice
-
-        let entryTime = new Date().toISOString()
-        const entryTsRaw = direction === 'LONG' ? boughtTs : soldTs
-        if (entryTsRaw) {
-          const parsed = new Date(entryTsRaw)
-          if (!isNaN(parsed.getTime())) entryTime = parsed.toISOString()
-        }
-
-        let exitTime = null
-        const exitTsRaw = direction === 'LONG' ? soldTs : boughtTs
-        if (exitTsRaw) {
-          const parsed = new Date(exitTsRaw)
-          if (!isNaN(parsed.getTime())) exitTime = parsed.toISOString()
-        }
-
-        const { error } = await supabase.from('trades').insert([{
-          user_id: user.id,
-          instrument: base,
-          direction,
-          entry_price: entryPrice,
-          exit_price: exitPrice,
-          contracts: qty || 1,
-          entry_time: entryTime,
-          exit_time: exitTime,
-          pnl,
-          is_open: false,
-          session: 'RTH',
-          emotional_state: 3,
-        }])
-
-        if (error) { errors.push(`Row skipped: ${error.message}`); skipped++ }
-        else success++
-      } catch {
-        skipped++
-      }
+    for (const trade of tradesToInsert) {
+      const { error } = await supabase.from('trades').insert([{
+        user_id: user.id,
+        session: 'RTH',
+        emotional_state: 3,
+        is_open: false,
+        ...trade,
+      }])
+      if (error) { errors.push(`Row skipped: ${error.message}`); skipped++ }
+      else success++
     }
 
     setImportResults({ success, skipped, errors })
@@ -386,15 +381,12 @@ export default function Settings() {
           </div>
 
           <div className={styles.card}>
-            <h2 className={styles.cardTitle}>📥 Import Trades from Tradovate</h2>
+            <h2 className={styles.cardTitle}>📥 Import Trades</h2>
             <div className={styles.importInstructions}>
-              <p className={styles.instrTitle}>How to export from Tradovate:</p>
+              <p className={styles.instrTitle}>Supported formats:</p>
               <ol className={styles.instrList}>
-                <li>Log into Tradovate</li>
-                <li>Go to <strong>Account</strong> → <strong>Performance</strong></li>
-                <li>Click <strong>Export</strong> and choose <strong>CSV</strong></li>
-                <li>Open the file, select all, copy and paste below</li>
-                <li>Or click <strong>Upload CSV file</strong> to upload directly</li>
+                <li><strong>Tradovate</strong> — Account → Performance → Export CSV</li>
+                <li><strong>FXReplay</strong> — Analytics → Export CSV</li>
               </ol>
             </div>
 
@@ -410,7 +402,7 @@ export default function Settings() {
               <textarea
                 value={csvText}
                 onChange={e => setCsvText(e.target.value)}
-                placeholder="Paste your Tradovate CSV here..."
+                placeholder="Paste your CSV here..."
                 className={styles.csvTextarea}
                 rows={8}
               />
