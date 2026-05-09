@@ -158,52 +158,142 @@ export default function Settings() {
   }
 
   const parseFXReplayRows = (rows: Record<string, string>[]) => {
-    const pairMap: Record<string, string> = {
-      USATECHIDXUSD: 'NQ',
-      USAIDXUSD: 'ES',
-      USOILUSD: 'CL',
-      XAUUSD: 'GC',
-      XAGUSD: 'SI',
-    }
-    return rows.map(row => {
+  const pairMap: Record<string, string> = {
+    USATECHIDXUSD: 'NQ',
+    USAIDXUSD: 'ES',
+    USOILUSD: 'CL',
+    XAUUSD: 'GC',
+    XAGUSD: 'SI',
+  }
+
+  return rows.map(row => {
+    try {
       const pair = (row['pair'] || '').toUpperCase()
       const instrument = pairMap[pair] || pair
-      const direction = (row['side'] || '').toLowerCase() === 'buy' ? 'LONG' : 'SHORT'
+
+      const direction =
+        (row['side'] || '').toLowerCase() === 'buy'
+          ? 'LONG'
+          : 'SHORT'
+
       const entryPrice = parseFloat(row['entryprice'] || '0')
       const exitPrice = parseFloat(row['avgcloseprice'] || '0')
       const pnl = parseFloat(row['rpnl'] || '0')
-      const contracts = Math.round(parseFloat(row['amount'] || '1')) || 1
-      const entryTime = row['datestart'] ? new Date(row['datestart'].replace(' ', 'T')).toISOString() : new Date().toISOString()
-      const exitTime = row['dateend'] ? new Date(row['dateend'].replace(' ', 'T')).toISOString() : null
-      const setupTag = row['tags'] || null
-      const status = row['status'] || ''
-      if (!entryPrice || !exitPrice || status !== 'closed') return null
-      return { instrument, direction, entry_price: entryPrice, exit_price: exitPrice, pnl, contracts, entry_time: entryTime, exit_time: exitTime, setup_tag: setupTag }
-    }).filter(Boolean)
-  }
+
+      const contracts =
+        Math.round(parseFloat(row['amount'] || '1')) || 1
+
+      const status = (row['status'] || '').toLowerCase()
+
+      if (
+        !instrument ||
+        Number.isNaN(entryPrice) ||
+        Number.isNaN(exitPrice) ||
+        !entryPrice ||
+        !exitPrice ||
+        status !== 'closed'
+      ) {
+        return null
+      }
+
+      let entryTime = new Date().toISOString()
+
+      if (row['datestart']) {
+        const parsed = new Date(
+          row['datestart'].replace(' ', 'T')
+        )
+
+        if (!isNaN(parsed.getTime())) {
+          entryTime = parsed.toISOString()
+        }
+      }
+
+      let exitTime: string | null = null
+
+      if (row['dateend']) {
+        const parsed = new Date(
+          row['dateend'].replace(' ', 'T')
+        )
+
+        if (!isNaN(parsed.getTime())) {
+          exitTime = parsed.toISOString()
+        }
+      }
+
+      return {
+        instrument,
+        direction,
+        entry_price: entryPrice,
+        exit_price: exitPrice,
+        pnl,
+        contracts,
+        entry_time: entryTime,
+        exit_time: exitTime,
+        setup_tag: row['tags'] || null,
+      }
+    } catch (err) {
+      console.error('FXReplay parse error:', err)
+      return null
+    }
+  }).filter(Boolean)
+}
 
   const handleImport = async () => {
-    if (!user || !csvText.trim()) return
-    setImporting(true)
-    setImportResults(null)
+  if (!user || !csvText.trim()) return
 
-    const lines = csvText.trim().split('\n')
+  setImporting(true)
+  setImportResults(null)
+
+  try {
+    const lines = csvText
+      .trim()
+      .split('\n')
+      .filter(line => line.trim())
+
     if (lines.length < 2) {
-      setImportResults({ success: 0, skipped: 0, errors: ['No valid rows found.'] })
-      setImporting(false)
+      setImportResults({
+        success: 0,
+        skipped: 0,
+        errors: ['No valid rows found.'],
+      })
       return
     }
 
-    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, '').toLowerCase())
-    const rows = lines.slice(1).map(line => {
-      const values = line.split(',').map(v => v.trim().replace(/"/g, ''))
-      const row: Record<string, string> = {}
-      headers.forEach((h, i) => { row[h] = values[i] || '' })
-      return row
-    }).filter(row => Object.values(row).some(v => v !== ''))
+    const headers = lines[0]
+      .split(',')
+      .map(h =>
+        h
+          .trim()
+          .replace(/"/g, '')
+          .toLowerCase()
+      )
 
-    const isFXReplay = headers.includes('datestart') || headers.includes('rpnl')
-    const isTradovate = headers.includes('buyprice') || headers.includes('boughttimestamp')
+    const rows = lines
+      .slice(1)
+      .map(line => {
+        const values = line
+          .split(',')
+          .map(v => v.trim().replace(/"/g, ''))
+
+        const row: Record<string, string> = {}
+
+        headers.forEach((h, i) => {
+          row[h] = values[i] || ''
+        })
+
+        return row
+      })
+      .filter(row =>
+        Object.values(row).some(v => v !== '')
+      )
+
+    const isFXReplay =
+      headers.includes('datestart') ||
+      headers.includes('rpnl')
+
+    const isTradovate =
+      headers.includes('buyprice') ||
+      headers.includes('boughttimestamp')
 
     let tradesToInsert: any[] = []
     let skipped = 0
@@ -211,58 +301,186 @@ export default function Settings() {
 
     if (isFXReplay) {
       const parsed = parseFXReplayRows(rows)
+
       tradesToInsert = parsed.filter(Boolean)
+
       skipped = rows.length - tradesToInsert.length
     } else if (isTradovate) {
       for (const row of rows) {
         try {
           const symbol = row['symbol'] || ''
-          const qty = parseInt(row['qty'] || '1')
-          const buyPrice = parseFloat(row['buyprice'] || '0')
-          const sellPrice = parseFloat(row['sellprice'] || '0')
+
+          const qty =
+            parseInt(row['qty'] || '1') || 1
+
+          const buyPrice = parseFloat(
+            row['buyprice'] || '0'
+          )
+
+          const sellPrice = parseFloat(
+            row['sellprice'] || '0'
+          )
+
           const pnlRaw = row['pnl'] || '0'
-          const boughtTs = row['boughttimestamp'] || ''
-          const soldTs = row['soldtimestamp'] || ''
-          const buyFillId = row['buyfillid'] || '0'
-          const sellFillId = row['sellfillid'] || '0'
-          if (!symbol || !buyPrice || !sellPrice) { skipped++; continue }
+
+          const boughtTs =
+            row['boughttimestamp'] || ''
+
+          const soldTs =
+            row['soldtimestamp'] || ''
+
+          const buyFillId =
+            row['buyfillid'] || '0'
+
+          const sellFillId =
+            row['sellfillid'] || '0'
+
+          if (
+            !symbol ||
+            Number.isNaN(buyPrice) ||
+            Number.isNaN(sellPrice) ||
+            !buyPrice ||
+            !sellPrice
+          ) {
+            skipped++
+            continue
+          }
+
           const base = getBase(symbol)
+
           const pnl = parsePnl(pnlRaw)
-          const direction = parseInt(buyFillId) < parseInt(sellFillId) ? 'LONG' : 'SHORT'
-          const entryPrice = direction === 'LONG' ? buyPrice : sellPrice
-          const exitPrice = direction === 'LONG' ? sellPrice : buyPrice
+
+          const direction =
+            parseInt(buyFillId) <
+            parseInt(sellFillId)
+              ? 'LONG'
+              : 'SHORT'
+
+          const entryPrice =
+            direction === 'LONG'
+              ? buyPrice
+              : sellPrice
+
+          const exitPrice =
+            direction === 'LONG'
+              ? sellPrice
+              : buyPrice
+
           let entryTime = new Date().toISOString()
-          const entryTsRaw = direction === 'LONG' ? boughtTs : soldTs
-          if (entryTsRaw) { const p = new Date(entryTsRaw); if (!isNaN(p.getTime())) entryTime = p.toISOString() }
-          let exitTime = null
-          const exitTsRaw = direction === 'LONG' ? soldTs : boughtTs
-          if (exitTsRaw) { const p = new Date(exitTsRaw); if (!isNaN(p.getTime())) exitTime = p.toISOString() }
-          tradesToInsert.push({ instrument: base, direction, entry_price: entryPrice, exit_price: exitPrice, contracts: qty || 1, entry_time: entryTime, exit_time: exitTime, pnl, is_open: false })
-        } catch { skipped++ }
+
+          const entryTsRaw =
+            direction === 'LONG'
+              ? boughtTs
+              : soldTs
+
+          if (entryTsRaw) {
+            const parsed = new Date(entryTsRaw)
+
+            if (!isNaN(parsed.getTime())) {
+              entryTime = parsed.toISOString()
+            }
+          }
+
+          let exitTime: string | null = null
+
+          const exitTsRaw =
+            direction === 'LONG'
+              ? soldTs
+              : boughtTs
+
+          if (exitTsRaw) {
+            const parsed = new Date(exitTsRaw)
+
+            if (!isNaN(parsed.getTime())) {
+              exitTime = parsed.toISOString()
+            }
+          }
+
+          tradesToInsert.push({
+            instrument: base,
+            direction,
+            entry_price: entryPrice,
+            exit_price: exitPrice,
+            contracts: qty,
+            entry_time: entryTime,
+            exit_time: exitTime,
+            pnl,
+            is_open: false,
+          })
+        } catch (err) {
+          console.error('Tradovate parse error:', err)
+          skipped++
+        }
       }
     } else {
-      setImportResults({ success: 0, skipped: rows.length, errors: ['Unknown CSV format. Supported: Tradovate, FXReplay'] })
-      setImporting(false)
+      setImportResults({
+        success: 0,
+        skipped: rows.length,
+        errors: [
+          'Unknown CSV format. Supported: Tradovate, FXReplay',
+        ],
+      })
+
       return
     }
 
-    let success = 0
-    for (const trade of tradesToInsert) {
-      const { error } = await supabase.from('trades').insert([{
-        user_id: user.id,
-        session: 'RTH',
-        emotional_state: 3,
-        is_open: false,
-        ...trade,
-      }])
-      if (error) { errors.push(`Row skipped: ${error.message}`); skipped++ }
-      else success++
+    if (tradesToInsert.length === 0) {
+      setImportResults({
+        success: 0,
+        skipped,
+        errors: ['No valid trades found to import.'],
+      })
+
+      return
     }
 
-    setImportResults({ success, skipped, errors })
-    if (success > 0) setCsvText('')
+    const payload = tradesToInsert.map(trade => ({
+      user_id: user.id,
+      session: 'RTH',
+      emotional_state: 3,
+      is_open: false,
+      ...trade,
+    }))
+
+    console.log('Import payload:', payload)
+
+    const { error } = await supabase
+      .from('trades')
+      .insert(payload)
+
+    if (error) {
+      console.error(error)
+
+      setImportResults({
+        success: 0,
+        skipped: payload.length,
+        errors: [error.message],
+      })
+
+      return
+    }
+
+    setImportResults({
+      success: payload.length,
+      skipped,
+      errors,
+    })
+
+    setCsvText('')
+  } catch (err: any) {
+    console.error('Import failed:', err)
+
+    setImportResults({
+      success: 0,
+      skipped: 0,
+      errors: [
+        err?.message || 'Unexpected import error',
+      ],
+    })
+  } finally {
     setImporting(false)
   }
+}
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
