@@ -12,7 +12,8 @@ export async function POST(req: NextRequest) {
     const winners = closedTrades.filter((t: any) => t.pnl > 0)
     const losers = closedTrades.filter((t: any) => t.pnl < 0)
     const totalPnl = closedTrades.reduce((s: number, t: any) => s + t.pnl, 0)
-    const winRate = closedTrades.length > 0 ? (winners.length / closedTrades.length * 100).toFixed(1) : 0
+    const decidedTrades = closedTrades.filter((t: any) => t.pnl !== 0)
+  const winRate = decidedTrades.length > 0 ? (winners.length / decidedTrades.length * 100).toFixed(1) : 0
     const avgWin = winners.length > 0 ? (winners.reduce((s: number, t: any) => s + t.pnl, 0) / winners.length).toFixed(2) : 0
     const avgLoss = losers.length > 0 ? Math.abs(losers.reduce((s: number, t: any) => s + t.pnl, 0) / losers.length).toFixed(2) : 0
 

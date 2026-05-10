@@ -66,7 +66,8 @@ export default function TradeLog() {
   const totalPnl = closed.reduce((s, t) => s + t.pnl, 0)
   const winners = closed.filter(t => t.pnl > 0)
   const losers = closed.filter(t => t.pnl < 0)
-  const winRate = closed.length > 0 ? Math.round((winners.length / closed.length) * 100) : 0
+  const decidedTrades = closed.filter(t => t.pnl !== 0)
+  const winRate = decidedTrades.length > 0 ? Math.round((winners.length / decidedTrades.length) * 100) : 0
   const avgWin = winners.length > 0 ? winners.reduce((s, t) => s + t.pnl, 0) / winners.length : 0
   const avgLoss = losers.length > 0 ? Math.abs(losers.reduce((s, t) => s + t.pnl, 0) / losers.length) : 0
 
