@@ -22,7 +22,6 @@ export default function Sidebar({ userEmail }: { userEmail: string }) {
     { href: '/dashboard/analytics', icon: '📈', label: 'Analytics' },
     { href: '/dashboard/playbook', icon: '📋', label: 'Playbook' },
     { href: '/dashboard/risk', icon: '🛡️', label: 'Risk Rules' },
-    { href: '/dashboard/ai-coach', icon: '🤖', label: 'AI Coach' },
     { href: '/dashboard/settings', icon: '⚙️', label: 'Settings' },
   ]
 
