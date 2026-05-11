@@ -486,6 +486,40 @@ export default function Settings() {
   }
 }
 
+const handleExportCSV = async () => {
+    if (!user) return
+    const { data: trades } = await supabase
+      .from('trades')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('entry_time', { ascending: false })
+
+    if (!trades || trades.length === 0) return
+
+    const headers = ['Date', 'Instrument', 'Direction', 'Entry Price', 'Exit Price', 'Contracts', 'P&L', 'Setup Tag', 'Mistake Tag', 'Notes']
+    const rows = trades.map(t => [
+      new Date(t.entry_time).toLocaleDateString(),
+      t.instrument,
+      t.direction,
+      t.entry_price,
+      t.exit_price ?? '',
+      t.contracts,
+      t.pnl ?? '',
+      t.setup_tag ?? '',
+      t.mistake_tag ?? '',
+      t.notes ?? '',
+    ])
+
+    const csv = [headers, ...rows].map(row => row.map(v => `"${v}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `futuresjournal-trades-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -502,6 +536,14 @@ export default function Settings() {
       </div>
     )
   }
+
+  <div className={styles.card}>
+            <h2 className={styles.cardTitle}>📤 Export Your Trades</h2>
+            <p className={styles.fieldHint}>Download all your trades as a CSV file. Your data, always yours.</p>
+            <button onClick={handleExportCSV} className={styles.btnPrimary}>
+              📤 Download CSV
+            </button>
+          </div>
 
   return (
     <div className={styles.layout}>
