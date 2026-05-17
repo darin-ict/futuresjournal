@@ -118,8 +118,8 @@ export default function Analytics() {
   const winners = trades.filter(t => t.pnl > 0)
   const losers = trades.filter(t => t.pnl < 0)
   const totalPnl = trades.reduce((s, t) => s + t.pnl, 0)
-  const decidedTrades = trades.filter(t => t.pnl !== 0)
-  const winRate = decidedTrades.length > 0 ? (winners.length / decidedTrades.length) * 100 : 0
+  const breakevens = trades.filter(t => t.pnl === 0)
+  const winRate = trades.length > 0 ? ((winners.length + breakevens.length) / trades.length) * 100 : 0
   const avgWin = winners.length > 0 ? winners.reduce((s, t) => s + t.pnl, 0) / winners.length : 0
   const avgLoss = losers.length > 0 ? Math.abs(losers.reduce((s, t) => s + t.pnl, 0) / losers.length) : 0
   const profitFactor = avgLoss > 0 ? avgWin / avgLoss : 0
