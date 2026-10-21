@@ -224,8 +224,11 @@ export default function Settings() {
   }
 }
 
+      
       return {
+        symbol: (instrument.split(':').pop() || instrument),
         instrument,
+        side: direction === 'LONG' ? 'buy' : 'sell',
         direction,
         entry_price: entryPrice,
         exit_price: exitPrice,
