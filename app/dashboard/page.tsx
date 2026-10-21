@@ -409,8 +409,10 @@ export default function Dashboard() {
               </div>
               <div className={styles.pnlHeroDivider} />
               <div className={styles.pnlHeroStat}>
-                <span className={`${styles.pnlHeroStatValue} ${styles.green}`}>{winners.length}</span>
-                <span className={styles.pnlHeroStatLabel}>Winners</span>
+                
+<span className={`${styles.pnlHeroStatValue} ${styles.green}`}>{winners.length + closed.filter(t => t.pnl === 0).length}</span>
+<span className={styles.pnlHeroStatLabel}>Wins (incl. BE)</span>
+
               </div>
               <div className={styles.pnlHeroDivider} />
               <div className={styles.pnlHeroStat}>
