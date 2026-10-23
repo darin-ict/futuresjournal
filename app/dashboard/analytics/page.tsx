@@ -12,6 +12,17 @@ function CalendarView({ trades }: { trades: any[] }) {
   const year = currentMonth.getFullYear()
   const month = currentMonth.getMonth()
 
+  // Filter trades for the currently viewed month
+  const monthTrades = trades.filter(t => {
+    const d = new Date(t.entry_time)
+    return d.getFullYear() === year && d.getMonth() === month
+  })
+
+  const monthPnl = monthTrades.reduce((sum, t) => sum + t.pnl, 0)
+  const monthWins = monthTrades.filter(t => t.pnl > 0).length
+  const monthBes = monthTrades.filter(t => t.pnl === 0).length
+  const monthLosses = monthTrades.filter(t => t.pnl < 0).length
+
   const pnlByDate: Record<string, number> = {}
   trades.forEach(t => {
     const d = new Date(t.entry_time).toDateString()
@@ -31,13 +42,30 @@ function CalendarView({ trades }: { trades: any[] }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <button onClick={prevMonth} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '6px 14px', borderRadius: '7px', cursor: 'pointer', fontSize: '14px' }}>←</button>
-        <span style={{ fontSize: '15px', fontWeight: '700' }}>
-          {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-        </span>
-        <button onClick={nextMonth} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '6px 14px', borderRadius: '7px', cursor: 'pointer', fontSize: '14px' }}>→</button>
+      {/* Calendar Header with Month Nav & Monthly Summary Stats */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+        <button onClick={prevMonth} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '6px 14px', borderRadius: '7px', cursor: 'pointer', fontSize: '14px' }}>← Prev</button>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', textAlign: 'center' }}>
+          <span style={{ fontSize: '16px', fontWeight: '800' }}>
+            {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', background: 'var(--bg-secondary)', padding: '4px 12px', borderRadius: '20px', border: '1px solid var(--border)' }}>
+            <span style={{ fontWeight: '700', color: monthPnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' }}>
+              {monthPnl >= 0 ? '+' : ''}${monthPnl.toFixed(2)}
+            </span>
+            <span style={{ color: 'var(--text-muted)' }}>•</span>
+            <span style={{ color: 'var(--text-secondary)' }}>{monthTrades.length} trades</span>
+            <span style={{ color: 'var(--text-muted)' }}>•</span>
+            <span style={{ color: 'var(--accent-green)' }}>{monthWins}W</span>
+            <span style={{ color: 'var(--text-muted)' }}>{monthBes}BE</span>
+            <span style={{ color: 'var(--accent-red)' }}>{monthLosses}L</span>
+          </div>
+        </div>
+
+        <button onClick={nextMonth} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '6px 14px', borderRadius: '7px', cursor: 'pointer', fontSize: '14px' }}>Next →</button>
       </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '4px' }}>
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
           <div key={d} style={{ textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', padding: '4px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{d}</div>
@@ -369,13 +397,13 @@ export default function Analytics() {
               </div>
             )}
 
-          {/* Trading Calendar */}
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              <span className={styles.cardTitle}>Trading Calendar</span>
+            {/* Trading Calendar */}
+            <div className={styles.card}>
+              <div className={styles.cardHeader}>
+                <span className={styles.cardTitle}>Trading Calendar</span>
+              </div>
+              <CalendarView trades={trades} />
             </div>
-            <CalendarView trades={trades} />
-          </div>
 
           </div>
         )}
