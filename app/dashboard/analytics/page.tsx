@@ -6,13 +6,115 @@ import Link from 'next/link'
 import Sidebar from '../../components/Sidebar'
 import styles from './analytics.module.css'
 
+function EquityCurveChart({ data }: { data: { date: string; value: number }[] }) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null)
+
+  if (!data || data.length < 2) return null
+
+  const values = data.map(d => d.value)
+  const minVal = Math.min(0, ...values)
+  const maxVal = Math.max(0, ...values)
+  const range = maxVal - minVal || 1
+
+  const width = 800
+  const height = 220
+  const padding = 30
+
+  // Convert points to SVG coordinates
+  const points = data.map((d, i) => {
+    const x = padding + (i / (data.length - 1)) * (width - padding * 2)
+    const y = height - padding - ((d.value - minVal) / range) * (height - padding * 2)
+    return { x, y, date: d.date, value: d.value }
+  })
+
+  // Zero-line Y position
+  const zeroY = height - padding - ((0 - minVal) / range) * (height - padding * 2)
+
+  // Construct smooth line SVG path
+  const linePath = points.reduce((acc, p, i) => {
+    return i === 0 ? `M ${p.x},${p.y}` : `${acc} L ${p.x},${p.y}`
+  }, '')
+
+  // Closed path for subtle gradient fill
+  const areaPath = `${linePath} L ${points[points.length - 1].x},${zeroY} L ${points[0].x},${zeroY} Z`
+
+  const finalValue = data[data.length - 1]?.value || 0
+  const lineColor = finalValue >= 0 ? 'var(--accent-green, #00d4aa)' : 'var(--accent-red, #ff4757)'
+  const activePoint = hoverIndex !== null ? points[hoverIndex] : points[points.length - 1]
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {/* Active Balance Display */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+          <span style={{ fontSize: '24px', fontWeight: '800', color: activePoint.value >= 0 ? 'var(--accent-green, #00d4aa)' : 'var(--accent-red, #ff4757)' }}>
+            {activePoint.value >= 0 ? '+' : ''}${activePoint.value.toFixed(2)}
+          </span>
+          <span style={{ fontSize: '12px', color: 'var(--text-muted, #888)' }}>
+            {activePoint.date}
+          </span>
+        </div>
+        <span style={{ fontSize: '11px', color: 'var(--text-muted, #888)' }}>
+          Hover over line for trade history
+        </span>
+      </div>
+
+      <div style={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
+        <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+          <defs>
+            <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={lineColor} stopOpacity="0.3" />
+              <stop offset="100%" stopColor={lineColor} stopOpacity="0.0" />
+            </linearGradient>
+            <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor={lineColor} floodOpacity="0.4" />
+            </filter>
+          </defs>
+
+          {/* Background Grid Lines */}
+          <line x1={padding} y1={padding} x2={width - padding} y2={padding} stroke="var(--border, #262626)" strokeDasharray="4 4" opacity="0.5" />
+          <line x1={padding} y1={zeroY} x2={width - padding} y2={zeroY} stroke="var(--text-muted, #555)" strokeDasharray="2 2" opacity="0.7" />
+          <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="var(--border, #262626)" strokeDasharray="4 4" opacity="0.5" />
+
+          {/* Area Fill */}
+          <path d={areaPath} fill="url(#equityGradient)" />
+
+          {/* Main Line */}
+          <path d={linePath} fill="none" stroke={lineColor} strokeWidth="2.5" filter="url(#glow)" strokeLinecap="round" strokeLinejoin="round" />
+
+          {/* Interactive Hover Markers */}
+          {points.map((p, i) => (
+            <g key={i}>
+              <rect
+                x={p.x - (width - padding * 2) / (points.length * 2)}
+                y={0}
+                width={(width - padding * 2) / points.length}
+                height={height}
+                fill="transparent"
+                style={{ cursor: 'pointer' }}
+                onMouseEnter={() => setHoverIndex(i)}
+                onMouseLeave={() => setHoverIndex(null)}
+              />
+              {hoverIndex === i && (
+                <>
+                  <line x1={p.x} y1={padding} x2={p.x} y2={height - padding} stroke="var(--text-muted, #888)" strokeDasharray="3 3" opacity="0.6" />
+                  <circle cx={p.x} cy={p.y} r="5" fill={lineColor} stroke="var(--bg-primary, #000)" strokeWidth="2" />
+                </>
+              )}
+            </g>
+          ))}
+        </svg>
+      </div>
+    </div>
+  )
+}
+
 function CalendarView({ trades }: { trades: any[] }) {
   const [currentMonth, setCurrentMonth] = useState(new Date())
 
   const year = currentMonth.getFullYear()
   const month = currentMonth.getMonth()
 
-  // Filter trades for the currently viewed month
   const monthTrades = trades.filter(t => {
     const d = new Date(t.entry_time)
     return d.getFullYear() === year && d.getMonth() === month
@@ -42,7 +144,6 @@ function CalendarView({ trades }: { trades: any[] }) {
 
   return (
     <div>
-      {/* Calendar Header with Month Nav & Monthly Summary Stats */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <button onClick={prevMonth} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '6px 14px', borderRadius: '7px', cursor: 'pointer', fontSize: '14px' }}>← Prev</button>
         
@@ -269,32 +370,16 @@ export default function Analytics() {
               ))}
             </div>
 
-            {/* Equity Curve */}
+            {/* New SVG Equity Curve */}
             {equityCurve.length > 1 && (
               <div className={styles.card}>
                 <div className={styles.cardHeader}>
                   <span className={styles.cardTitle}>Equity Curve</span>
                   <span className={`${styles.cardBadge} ${totalPnl >= 0 ? styles.green : styles.red}`}>
-                    {totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)} total
+                    {totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)} net
                   </span>
                 </div>
-                <div className={styles.equityWrap}>
-                  <div className={styles.equityCurve}>
-                    {equityCurve.map((p, i) => {
-                      const max = Math.max(...equityCurve.map(x => Math.abs(x.value)), 1)
-                      const h = Math.abs(p.value) / max * 100
-                      return (
-                        <div key={i} className={styles.equityBar} title={`${p.date}: $${p.value.toFixed(2)}`}>
-                          <div className={`${styles.equityBarFill} ${p.value >= 0 ? styles.equityBarGreen : styles.equityBarRed}`} style={{ height: `${h}%` }} />
-                        </div>
-                      )
-                    })}
-                  </div>
-                  <div className={styles.equityLabels}>
-                    <span>{equityCurve[0]?.date}</span>
-                    <span>{equityCurve[equityCurve.length - 1]?.date}</span>
-                  </div>
-                </div>
+                <EquityCurveChart data={equityCurve} />
               </div>
             )}
 
