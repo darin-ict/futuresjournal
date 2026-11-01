@@ -217,6 +217,56 @@ function CalendarView({ trades }: { trades: any[] }) {
   )
 }
 
+
+function formatDuration(totalMinutes: number) {
+  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return '0m'
+  const days = Math.floor(totalMinutes / 1440)
+  const hours = Math.floor((totalMinutes % 1440) / 60)
+  const minutes = Math.round(totalMinutes % 60)
+  if (days > 0) return `${days}d ${hours}h`
+  if (hours > 0) return `${hours}h ${minutes}m`
+  return `${minutes}m`
+}
+
+function TimeInvestedChart({ data }: { data: { label: string; minutes: number }[] }) {
+  const max = Math.max(...data.map(d => d.minutes), 1)
+  return (
+    <div className={styles.timeChart}>
+      <div className={styles.timeChartScale}>
+        <span>{formatDuration(max)}</span>
+        <span>{formatDuration(max / 2)}</span>
+        <span>0</span>
+      </div>
+      <div className={styles.timeChartPlot}>
+        <div className={styles.chartGridLine} />
+        <div className={styles.chartGridLine} />
+        <div className={styles.chartGridLine} />
+        {data.map((item, index) => (
+          <div className={styles.timeBarColumn} key={`${item.label}-${index}`} title={`${item.label}: ${formatDuration(item.minutes)}`}>
+            <div className={styles.timeBarTrack}>
+              <div className={styles.timeBar} style={{ height: `${Math.max((item.minutes / max) * 100, item.minutes > 0 ? 2 : 0)}%` }} />
+            </div>
+            <span className={styles.timeBarLabel}>{item.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function Donut({ percent, color = 'purple' }: { percent: number; color?: 'purple' | 'green' }) {
+  const safePercent = Math.max(0, Math.min(100, percent))
+  return (
+    <div
+      className={`${styles.donut} ${color === 'green' ? styles.donutGreen : ''}`}
+      style={{ background: `conic-gradient(var(--donut-color) ${safePercent * 3.6}deg, var(--donut-track) 0deg)` }}
+      aria-label={`${safePercent.toFixed(1)} percent`}
+    >
+      <div className={styles.donutHole} />
+    </div>
+  )
+}
+
 export default function Analytics() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
@@ -234,262 +284,269 @@ export default function Analytics() {
   }, [])
 
   const fetchTrades = async (userId: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('trades')
       .select('*')
       .eq('user_id', userId)
       .eq('is_open', false)
       .not('pnl', 'is', null)
+      .order('entry_time', { ascending: true })
+
+    if (error) console.error('Failed to load analytics trades:', error)
     setTrades(data || [])
     setLoading(false)
   }
 
-  const winners = trades.filter(t => t.pnl > 0)
-  const losers = trades.filter(t => t.pnl < 0)
-  const totalPnl = trades.reduce((s, t) => s + t.pnl, 0)
-  const breakevens = trades.filter(t => t.pnl === 0)
-  const winRate = trades.length > 0 ? ((winners.length + breakevens.length) / trades.length) * 100 : 0
-  const avgWin = winners.length > 0 ? winners.reduce((s, t) => s + t.pnl, 0) / winners.length : 0
-  const avgLoss = losers.length > 0 ? Math.abs(losers.reduce((s, t) => s + t.pnl, 0) / losers.length) : 0
-  const profitFactor = avgLoss > 0 ? avgWin / avgLoss : 0
-  const bestTrade = trades.length > 0 ? Math.max(...trades.map(t => t.pnl)) : 0
-  const worstTrade = trades.length > 0 ? Math.min(...trades.map(t => t.pnl)) : 0
-  const expectancy = trades.length > 0 ? (winRate / 100) * avgWin - (1 - winRate / 100) * avgLoss : 0
+  const winners = trades.filter(t => Number(t.pnl) > 0)
+  const losers = trades.filter(t => Number(t.pnl) < 0)
+  const breakevens = trades.filter(t => Number(t.pnl) === 0)
+  const totalPnl = trades.reduce((sum, t) => sum + Number(t.pnl || 0), 0)
+  const grossProfit = winners.reduce((sum, t) => sum + Number(t.pnl), 0)
+  const grossLoss = Math.abs(losers.reduce((sum, t) => sum + Number(t.pnl), 0))
+  const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : 0
+  const avgWin = winners.length ? grossProfit / winners.length : 0
+  const avgLoss = losers.length ? grossLoss / losers.length : 0
+  // Keep the journal's existing convention: breakeven trades count as wins in win rate.
+  const winRate = trades.length ? ((winners.length + breakevens.length) / trades.length) * 100 : 0
+  const longTrades = trades.filter(t => t.direction === 'LONG').length
+  const shortTrades = trades.filter(t => t.direction === 'SHORT').length
+  const longPercent = trades.length ? (longTrades / trades.length) * 100 : 0
 
-  let maxConsecWins = 0, maxConsecLosses = 0, curWins = 0, curLosses = 0
-  trades.forEach(t => {
-    if (t.pnl > 0) { curWins++; curLosses = 0; maxConsecWins = Math.max(maxConsecWins, curWins) }
-    else { curLosses++; curWins = 0; maxConsecLosses = Math.max(maxConsecLosses, curLosses) }
+  const durations = trades.map(t => {
+    const start = new Date(t.entry_time).getTime()
+    const end = new Date(t.exit_time).getTime()
+    return Number.isFinite(start) && Number.isFinite(end) && end > start ? (end - start) / 60000 : 0
   })
+  const totalMinutes = durations.reduce((sum, value) => sum + value, 0)
+  const timedTrades = durations.filter(value => value > 0).length
+
+  const dailyMinutes: Record<string, number> = {}
+  trades.forEach((trade, index) => {
+    if (durations[index] <= 0) return
+    const date = new Date(trade.entry_time)
+    const key = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    dailyMinutes[key] = (dailyMinutes[key] || 0) + durations[index]
+  })
+  const timeChartData = Object.entries(dailyMinutes).slice(-12).map(([label, minutes]) => ({ label, minutes }))
 
   const sorted = [...trades].sort((a, b) => new Date(a.entry_time).getTime() - new Date(b.entry_time).getTime())
-  let cum = 0
-  const equityCurve = sorted.map(t => { cum += t.pnl; return { date: new Date(t.entry_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), value: cum } })
+  let runningPnl = 0
+  const equityCurve = sorted.map(t => {
+    runningPnl += Number(t.pnl || 0)
+    return {
+      date: new Date(t.entry_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      value: runningPnl,
+    }
+  })
 
   const byInstrument: Record<string, { pnl: number; count: number; wins: number }> = {}
-  trades.forEach(t => {
-    if (!byInstrument[t.instrument]) byInstrument[t.instrument] = { pnl: 0, count: 0, wins: 0 }
-    byInstrument[t.instrument].pnl += t.pnl
-    byInstrument[t.instrument].count++
-    if (t.pnl > 0) byInstrument[t.instrument].wins++
-  })
-
   const bySetup: Record<string, { pnl: number; count: number; wins: number }> = {}
-  trades.forEach(t => {
-    const key = t.setup_tag || 'No Tag'
-    if (!bySetup[key]) bySetup[key] = { pnl: 0, count: 0, wins: 0 }
-    bySetup[key].pnl += t.pnl
-    bySetup[key].count++
-    if (t.pnl > 0) bySetup[key].wins++
-  })
-
+  const byMistake: Record<string, { pnl: number; count: number }> = {}
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   const byDay: Record<string, { pnl: number; count: number }> = {}
-  days.forEach(d => { byDay[d] = { pnl: 0, count: 0 } })
+  days.forEach(day => { byDay[day] = { pnl: 0, count: 0 } })
+
   trades.forEach(t => {
-    const day = days[new Date(t.entry_time).getDay()]
-    byDay[day].pnl += t.pnl
-    byDay[day].count++
+    const instrument = t.instrument || 'Unknown'
+    if (!byInstrument[instrument]) byInstrument[instrument] = { pnl: 0, count: 0, wins: 0 }
+    byInstrument[instrument].pnl += Number(t.pnl || 0)
+    byInstrument[instrument].count++
+    if (Number(t.pnl) > 0) byInstrument[instrument].wins++
+
+    const setup = t.setup_tag || 'No Tag'
+    if (!bySetup[setup]) bySetup[setup] = { pnl: 0, count: 0, wins: 0 }
+    bySetup[setup].pnl += Number(t.pnl || 0)
+    bySetup[setup].count++
+    if (Number(t.pnl) > 0) bySetup[setup].wins++
+
+    const weekday = days[new Date(t.entry_time).getDay()]
+    byDay[weekday].pnl += Number(t.pnl || 0)
+    byDay[weekday].count++
+
+    if (t.mistake_tag) {
+      if (!byMistake[t.mistake_tag]) byMistake[t.mistake_tag] = { pnl: 0, count: 0 }
+      byMistake[t.mistake_tag].pnl += Number(t.pnl || 0)
+      byMistake[t.mistake_tag].count++
+    }
   })
 
-  const byMistake: Record<string, { pnl: number; count: number }> = {}
-  trades.filter(t => t.mistake_tag).forEach(t => {
-    if (!byMistake[t.mistake_tag]) byMistake[t.mistake_tag] = { pnl: 0, count: 0 }
-    byMistake[t.mistake_tag].pnl += t.pnl
-    byMistake[t.mistake_tag].count++
-  })
-
-  const maxBar = (vals: number[]) => Math.max(...vals.map(Math.abs), 1)
+  const maxAbs = (values: number[]) => Math.max(...values.map(Math.abs), 1)
+  const money = (value: number) => `${value < 0 ? '-' : value > 0 ? '+' : ''}$${Math.abs(value).toFixed(2)}`
 
   if (loading) {
-    return (
-      <div className={styles.loadingScreen}>
-        <div className={styles.loadingSpinner} />
-        <p>Crunching your numbers...</p>
-      </div>
-    )
+    return <div className={styles.loadingScreen}><div className={styles.loadingSpinner} /><p>Loading analytics...</p></div>
   }
 
   return (
     <div className={styles.layout}>
       <Sidebar userEmail={user?.email || ''} />
       <main className={styles.main}>
-
-        <div className={styles.topBar}>
+        <header className={styles.topBar}>
           <div className={styles.topBarLeft}>
+            <span className={styles.pageEyebrow}>JOURNAL / PERFORMANCE</span>
             <span className={styles.pageTitle}>Analytics</span>
-            <span className={styles.pageSubtitle}>Based on {trades.length} closed trades</span>
+            <span className={styles.pageSubtitle}>Your trading performance at a glance · {trades.length} closed trades</span>
           </div>
-        </div>
+          <Link href="/dashboard/trades" className={styles.topAction}>View trades <span>↗</span></Link>
+        </header>
 
         {trades.length === 0 ? (
           <div className={styles.content}>
             <div className={styles.emptyState}>
-              <span className={styles.emptyIcon}>📈</span>
+              <span className={styles.emptyIcon}>⌁</span>
               <h3>No closed trades yet</h3>
-              <p>Log some trades to unlock your analytics</p>
+              <p>Log or import trades to see your performance analytics.</p>
               <Link href="/dashboard/add-trade" className={styles.btnPrimary}>+ Log Trade</Link>
             </div>
           </div>
         ) : (
           <div className={styles.content}>
+            <section className={styles.heroGrid}>
+              <article className={styles.metricCard}>
+                <span className={styles.metricLabel}>Net P&amp;L</span>
+                <strong className={`${styles.metricValue} ${totalPnl >= 0 ? styles.green : styles.red}`}>{money(totalPnl)}</strong>
+                <span className={styles.metricFoot}>{winners.length} wins · {losers.length} losses · {breakevens.length} BE</span>
+              </article>
 
-            {/* Hero Stats */}
-            <div className={styles.heroStats}>
-              {[
-                { label: 'Total P&L', value: `${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)}`, sub: `${winners.length}W / ${losers.length}L`, color: totalPnl >= 0 ? 'green' : 'red', accent: totalPnl >= 0 ? 'accentGreen' : 'accentRed' },
-                { label: 'Win Rate', value: `${winRate.toFixed(1)}%`, sub: `${trades.length} total trades`, color: winRate >= 50 ? 'green' : 'red', accent: winRate >= 50 ? 'accentGreen' : 'accentRed' },
-                { label: 'Profit Factor', value: profitFactor > 0 ? profitFactor.toFixed(2) : '—', sub: 'Avg win / avg loss', color: profitFactor >= 1.5 ? 'green' : profitFactor >= 1 ? 'amber' : 'red', accent: 'accentPurple' },
-                { label: 'Expectancy', value: `$${expectancy.toFixed(2)}`, sub: 'Per trade average', color: expectancy >= 0 ? 'green' : 'red', accent: expectancy >= 0 ? 'accentGreen' : 'accentRed' },
-              ].map((s, i) => (
-                <div key={i} className={styles.heroStat}>
-                  <div className={`${styles.heroStatAccent} ${styles[s.accent]}`} />
-                  <span className={styles.heroStatLabel}>{s.label}</span>
-                  <span className={`${styles.heroStatValue} ${styles[s.color]}`}>{s.value}</span>
-                  <span className={styles.heroStatSub}>{s.sub}</span>
+              <article className={styles.metricCard}>
+                <span className={styles.metricLabel}>Profit factor</span>
+                <div className={styles.metricInline}>
+                  <strong className={styles.metricValue}>{grossLoss > 0 ? profitFactor.toFixed(2) : grossProfit > 0 ? '∞' : '—'}</strong>
+                  <Donut percent={grossProfit + grossLoss > 0 ? grossProfit / (grossProfit + grossLoss) * 100 : 0} />
                 </div>
-              ))}
-            </div>
+                <span className={styles.metricFoot}>{money(grossProfit)} gross profit · {money(-grossLoss)} gross loss</span>
+              </article>
 
-            {/* Secondary Stats */}
-            <div className={styles.secondaryStats}>
-              {[
-                { label: 'Avg Winner', value: `$${avgWin.toFixed(2)}`, color: 'green' },
-                { label: 'Avg Loser', value: `-$${avgLoss.toFixed(2)}`, color: 'red' },
-                { label: 'Best Trade', value: `+$${bestTrade.toFixed(2)}`, color: 'green' },
-                { label: 'Worst Trade', value: `$${worstTrade.toFixed(2)}`, color: 'red' },
-                { label: 'Max Consec. Wins', value: `${maxConsecWins}`, color: 'green' },
-                { label: 'Max Consec. Losses', value: `${maxConsecLosses}`, color: 'red' },
-                { label: 'Total Trades', value: `${trades.length}`, color: 'neutral' },
-                { label: 'Winners / Losers', value: `${winners.length} / ${losers.length}`, color: 'neutral' },
-              ].map((s, i) => (
-                <div key={i} className={styles.secondaryStat}>
-                  <span className={styles.secondaryStatLabel}>{s.label}</span>
-                  <span className={`${styles.secondaryStatValue} ${styles[s.color]}`}>{s.value}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* New SVG Equity Curve */}
-            {equityCurve.length > 1 && (
-              <div className={styles.card}>
-                <div className={styles.cardHeader}>
-                  <span className={styles.cardTitle}>Equity Curve</span>
-                  <span className={`${styles.cardBadge} ${totalPnl >= 0 ? styles.green : styles.red}`}>
-                    {totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)} net
-                  </span>
-                </div>
-                <EquityCurveChart data={equityCurve} />
-              </div>
-            )}
-
-            {/* Instrument + Setup side by side */}
-            <div className={styles.twoCol}>
-              {Object.keys(byInstrument).length > 0 && (
-                <div className={styles.card}>
-                  <div className={styles.cardHeader}>
-                    <span className={styles.cardTitle}>By Instrument</span>
+              <article className={styles.metricCard}>
+                <span className={styles.metricLabel}>Avg win vs. loss</span>
+                <div className={styles.averageCompare}>
+                  <div className={styles.averageRow}>
+                    <strong className={styles.green}>{money(avgWin)}</strong>
+                    <span className={styles.compareDash} />
                   </div>
-                  <div className={styles.breakdownTable}>
-                    <div className={styles.breakdownHead}>
-                      <span>Instrument</span><span>Trades</span><span>WR</span><span>P&L</span><span>Bar</span>
+                  <div className={styles.compareTrack}>
+                    <div className={styles.compareWin} style={{ width: `${avgWin + avgLoss > 0 ? avgWin / (avgWin + avgLoss) * 100 : 0}%` }} />
+                  </div>
+                  <div className={styles.averageRow}>
+                    <span className={styles.metricFoot}>Average loss</span>
+                    <strong className={styles.red}>{avgLoss ? `-${avgLoss.toFixed(2)}` : '—'}</strong>
+                  </div>
+                </div>
+              </article>
+            </section>
+
+            <section className={styles.overviewGrid}>
+              <div className={styles.smallStatsGrid}>
+                <article className={styles.statPanel}>
+                  <span className={styles.metricLabel}>Time invested</span>
+                  <strong className={styles.statValue}>{formatDuration(totalMinutes)}</strong>
+                  <span className={styles.metricFoot}>{timedTrades} trades with valid entry/exit times</span>
+                </article>
+                <article className={styles.statPanel}>
+                  <span className={styles.metricLabel}>Time replayed</span>
+                  <strong className={styles.statValue}>Not tracked</strong>
+                  <span className={styles.metricFoot}>Replay duration isn't stored in your trade data</span>
+                </article>
+                <article className={styles.statPanel}>
+                  <span className={styles.metricLabel}>Trades taken</span>
+                  <div className={styles.statBottom}>
+                    <div>
+                      <strong className={styles.statValue}>{trades.length}</strong>
+                      <span className={styles.metricFoot}>{longPercent.toFixed(0)}% long · {(100 - longPercent).toFixed(0)}% short</span>
                     </div>
-                    {Object.entries(byInstrument).sort((a, b) => b[1].pnl - a[1].pnl).map(([inst, data]) => {
-                      const wr = Math.round((data.wins / data.count) * 100)
-                      const bw = Math.abs(data.pnl) / maxBar(Object.values(byInstrument).map(d => d.pnl)) * 100
-                      return (
-                        <div key={inst} className={styles.breakdownRow}>
-                          <span className={styles.breakdownName}>{inst}</span>
-                          <span>{data.count}</span>
-                          <span className={wr >= 50 ? styles.green : styles.red}>{wr}%</span>
-                          <span className={data.pnl >= 0 ? styles.green : styles.red}>{data.pnl >= 0 ? '+' : ''}${data.pnl.toFixed(0)}</span>
-                          <span className={styles.barCell}><div className={`${styles.bar} ${data.pnl >= 0 ? styles.barGreen : styles.barRed}`} style={{ width: `${bw}%` }} /></span>
-                        </div>
-                      )
-                    })}
+                    <Donut percent={longPercent} />
                   </div>
+                </article>
+                <article className={styles.statPanel}>
+                  <span className={styles.metricLabel}>Win rate</span>
+                  <div className={styles.statBottom}>
+                    <div>
+                      <strong className={styles.statValue}>{winRate.toFixed(1)}%</strong>
+                      <span className={styles.metricFoot}>{winners.length + breakevens.length}W · {losers.length}L (BE counted as wins)</span>
+                    </div>
+                    <Donut percent={winRate} color="green" />
+                  </div>
+                </article>
+              </div>
+
+              <article className={`${styles.panel} ${styles.timePanel}`}>
+                <div className={styles.panelHeader}>
+                  <span className={styles.panelTitle}>Time invested</span>
+                  <span className={styles.panelMeta}>By trading day</span>
                 </div>
+                {timeChartData.length ? <TimeInvestedChart data={timeChartData} /> : (
+                  <div className={styles.chartEmpty}>Entry and exit times are needed to calculate time invested.</div>
+                )}
+              </article>
+            </section>
+
+            <section className={styles.lowerGrid}>
+              {equityCurve.length > 1 && (
+                <article className={`${styles.panel} ${styles.widePanel}`}>
+                  <div className={styles.panelHeader}>
+                    <span className={styles.panelTitle}>Equity curve</span>
+                    <span className={`${styles.panelMeta} ${totalPnl >= 0 ? styles.green : styles.red}`}>{money(totalPnl)} net</span>
+                  </div>
+                  <EquityCurveChart data={equityCurve} />
+                </article>
               )}
 
-              {Object.keys(bySetup).length > 0 && (
-                <div className={styles.card}>
-                  <div className={styles.cardHeader}>
-                    <span className={styles.cardTitle}>By Setup</span>
-                  </div>
-                  <div className={styles.breakdownTable}>
-                    <div className={styles.breakdownHead}>
-                      <span>Setup</span><span>Trades</span><span>WR</span><span>P&L</span><span>Bar</span>
-                    </div>
-                    {Object.entries(bySetup).sort((a, b) => b[1].pnl - a[1].pnl).map(([setup, data]) => {
-                      const wr = Math.round((data.wins / data.count) * 100)
-                      const bw = Math.abs(data.pnl) / maxBar(Object.values(bySetup).map(d => d.pnl)) * 100
-                      return (
-                        <div key={setup} className={styles.breakdownRow}>
-                          <span className={styles.breakdownName}>{setup}</span>
-                          <span>{data.count}</span>
-                          <span className={wr >= 50 ? styles.green : styles.red}>{wr}%</span>
-                          <span className={data.pnl >= 0 ? styles.green : styles.red}>{data.pnl >= 0 ? '+' : ''}${data.pnl.toFixed(0)}</span>
-                          <span className={styles.barCell}><div className={`${styles.bar} ${data.pnl >= 0 ? styles.barGreen : styles.barRed}`} style={{ width: `${bw}%` }} /></span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Day of Week */}
-            <div className={styles.card}>
-              <div className={styles.cardHeader}>
-                <span className={styles.cardTitle}>Performance by Day</span>
-              </div>
-              <div className={styles.dayGrid}>
-                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map(day => {
-                  const data = byDay[day]
-                  return (
-                    <div key={day} className={styles.dayCard}>
-                      <span className={styles.dayName}>{day.slice(0, 3)}</span>
-                      <span className={`${styles.dayPnl} ${data.pnl > 0 ? styles.green : data.pnl < 0 ? styles.red : styles.muted}`}>
-                        {data.count > 0 ? `${data.pnl >= 0 ? '+' : ''}$${data.pnl.toFixed(0)}` : '—'}
-                      </span>
-                      <span className={styles.dayCount}>{data.count} trades</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Mistake Analysis */}
-            {Object.keys(byMistake).length > 0 && (
-              <div className={styles.card}>
-                <div className={styles.cardHeader}>
-                  <span className={styles.cardTitle}>Mistake Cost Analysis</span>
-                  <span className={styles.cardBadge}>{Object.keys(byMistake).length} mistake types</span>
-                </div>
+              <article className={styles.panel}>
+                <div className={styles.panelHeader}><span className={styles.panelTitle}>By instrument</span></div>
                 <div className={styles.breakdownTable}>
-                  <div className={styles.breakdownHead}>
-                    <span>Mistake</span><span>Times</span><span>Total Cost</span><span>Avg Cost</span>
-                  </div>
-                  {Object.entries(byMistake).sort((a, b) => a[1].pnl - b[1].pnl).map(([mistake, data]) => (
-                    <div key={mistake} className={styles.breakdownRow}>
-                      <span><span className={styles.mistakeTag}>{mistake}</span></span>
-                      <span>{data.count}×</span>
-                      <span className={styles.red}>${data.pnl.toFixed(2)}</span>
-                      <span className={styles.red}>${(data.pnl / data.count).toFixed(2)}</span>
+                  <div className={styles.breakdownHead}><span>Instrument</span><span>Trades</span><span>WR</span><span>P&amp;L</span></div>
+                  {Object.entries(byInstrument).sort((a, b) => b[1].pnl - a[1].pnl).map(([name, d]) => (
+                    <div className={styles.breakdownRow} key={name}>
+                      <strong>{name}</strong><span>{d.count}</span><span>{Math.round(d.wins / d.count * 100)}%</span><span className={d.pnl >= 0 ? styles.green : styles.red}>{money(d.pnl)}</span>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              </article>
 
-            {/* Trading Calendar */}
-            <div className={styles.card}>
-              <div className={styles.cardHeader}>
-                <span className={styles.cardTitle}>Trading Calendar</span>
-              </div>
-              <CalendarView trades={trades} />
-            </div>
+              <article className={styles.panel}>
+                <div className={styles.panelHeader}><span className={styles.panelTitle}>By setup</span></div>
+                <div className={styles.breakdownTable}>
+                  <div className={styles.breakdownHead}><span>Setup</span><span>Trades</span><span>WR</span><span>P&amp;L</span></div>
+                  {Object.entries(bySetup).sort((a, b) => b[1].pnl - a[1].pnl).map(([name, d]) => (
+                    <div className={styles.breakdownRow} key={name}>
+                      <strong>{name}</strong><span>{d.count}</span><span>{Math.round(d.wins / d.count * 100)}%</span><span className={d.pnl >= 0 ? styles.green : styles.red}>{money(d.pnl)}</span>
+                    </div>
+                  ))}
+                </div>
+              </article>
 
+              <article className={styles.panel}>
+                <div className={styles.panelHeader}><span className={styles.panelTitle}>Performance by day</span></div>
+                <div className={styles.dayGrid}>
+                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map(day => {
+                    const d = byDay[day]
+                    return <div className={styles.dayCard} key={day}>
+                      <span className={styles.dayName}>{day.slice(0, 3)}</span>
+                      <strong className={d.pnl > 0 ? styles.green : d.pnl < 0 ? styles.red : ''}>{d.count ? money(d.pnl) : '—'}</strong>
+                      <span className={styles.metricFoot}>{d.count} trades</span>
+                    </div>
+                  })}
+                </div>
+              </article>
+
+              {Object.keys(byMistake).length > 0 && (
+                <article className={styles.panel}>
+                  <div className={styles.panelHeader}><span className={styles.panelTitle}>Mistake cost analysis</span></div>
+                  <div className={styles.mistakeList}>
+                    {Object.entries(byMistake).sort((a, b) => a[1].pnl - b[1].pnl).map(([name, d]) => (
+                      <div className={styles.mistakeRow} key={name}>
+                        <span>{name}</span><span>{d.count}×</span><strong className={d.pnl <= 0 ? styles.red : styles.green}>{money(d.pnl)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              )}
+
+              <article className={`${styles.panel} ${styles.widePanel}`}>
+                <div className={styles.panelHeader}><span className={styles.panelTitle}>Trading calendar</span></div>
+                <CalendarView trades={trades} />
+              </article>
+            </section>
           </div>
         )}
       </main>
