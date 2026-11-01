@@ -3,6 +3,8 @@
 .layout {
   --gain: #7ad9b0;
   --loss: #f5919f;
+  --long: #f3c969;
+  --short: #a7a0ff;
   --rule: color-mix(in srgb, var(--text-secondary) 24%, transparent);
   --serif: var(--font-display), 'Iowan Old Style', Georgia, serif;
 
@@ -15,6 +17,8 @@
 :global([data-theme='light']) .layout {
   --gain: #167a5a;
   --loss: #c23552;
+  --long: #b87900;
+  --short: #6a5ee0;
 }
 
 .main {
@@ -22,12 +26,15 @@
   margin-left: 240px;
   max-width: calc(100vw - 240px);
   min-width: 0;
+  overflow-x: clip;
 }
 
 .inner {
+  position: relative;
+  isolation: isolate;
   max-width: 1080px;
   margin: 0 auto;
-  padding: 48px 56px 140px;
+  padding: 48px 56px 160px;
 }
 
 .title {
@@ -35,6 +42,52 @@
   font-weight: 500;
   color: var(--text-secondary);
   margin-bottom: 56px;
+}
+
+/* a slow, soft glow behind the page. green when you're up, rose when you're down */
+
+.auraUp { --aura: var(--gain); }
+.auraDown { --aura: var(--loss); }
+
+.auraUp::before,
+.auraDown::before,
+.auraUp::after,
+.auraDown::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.auraUp::before,
+.auraDown::before {
+  top: -60px;
+  left: -14%;
+  width: min(760px, 95%);
+  aspect-ratio: 1;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--aura) 24%, transparent), transparent);
+  animation: driftA 28s ease-in-out infinite alternate;
+}
+
+.auraUp::after,
+.auraDown::after {
+  top: 120px;
+  right: -18%;
+  width: min(560px, 75%);
+  aspect-ratio: 1;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--aura) 14%, transparent), transparent);
+  animation: driftB 34s ease-in-out infinite alternate;
+}
+
+@keyframes driftA {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(60px, 40px) scale(1.12); }
+}
+
+@keyframes driftB {
+  from { transform: translate(0, 0) scale(1.05); }
+  to { transform: translate(-50px, 70px) scale(0.92); }
 }
 
 /* ---------- loading ---------- */
@@ -120,8 +173,8 @@
 .lineGain { stroke: var(--gain); }
 .lineLoss { stroke: var(--loss); }
 
-.areaGain { fill: var(--gain); opacity: 0.12; }
-.areaLoss { fill: var(--loss); opacity: 0.12; }
+.areaGain { fill: var(--gain); opacity: 0.14; }
+.areaLoss { fill: var(--loss); opacity: 0.14; }
 
 .zeroLabel {
   position: absolute;
@@ -154,6 +207,42 @@
 .dotGain { background: var(--gain); }
 .dotLoss { background: var(--loss); }
 
+/* the live marker at the end of the curve: where you are right now */
+
+.pulse {
+  position: absolute;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  transform: translate(50%, -50%);
+  background: var(--c);
+  pointer-events: none;
+  animation: appear 0.5s ease 1.3s both;
+}
+
+.pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--c);
+  animation: ping 2.6s ease-out 1.8s infinite;
+}
+
+.pulseGain { --c: var(--gain); }
+.pulseLoss { --c: var(--loss); }
+
+@keyframes appear {
+  from { opacity: 0; transform: translate(50%, -50%) scale(0.2); }
+  to { opacity: 1; transform: translate(50%, -50%) scale(1); }
+}
+
+@keyframes ping {
+  0% { transform: scale(1); opacity: 0.55; }
+  80%, 100% { transform: scale(3.4); opacity: 0; }
+}
+
 .axis {
   display: flex;
   justify-content: space-between;
@@ -162,13 +251,25 @@
   color: var(--text-secondary);
 }
 
+.story {
+  margin-top: 56px;
+  max-width: 30em;
+  font-family: var(--serif);
+  font-variation-settings: 'SOFT' 100;
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(21px, 2.4vw, 28px);
+  line-height: 1.4;
+  letter-spacing: -0.005em;
+}
+
 /* ---------- headline numbers ---------- */
 
 .headline {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 40px;
-  margin-top: 96px;
+  margin-top: 88px;
 }
 
 .bigStat {
@@ -196,7 +297,7 @@
   font-size: 13px;
   line-height: 1.4;
   color: var(--text-secondary);
-  max-width: 24ch;
+  max-width: 26ch;
 }
 
 /* ---------- ledger of the rest ---------- */
@@ -229,7 +330,7 @@
 /* ---------- sections ---------- */
 
 .section {
-  margin-top: 120px;
+  margin-top: 128px;
 }
 
 .pair {
@@ -245,7 +346,7 @@
 .sectionTitle {
   font-family: var(--serif);
   font-variation-settings: 'SOFT' 100;
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 400;
   letter-spacing: -0.015em;
   line-height: 1.15;
@@ -253,11 +354,338 @@
 
 .sectionNote {
   margin-top: 8px;
-  margin-bottom: 28px;
+  margin-bottom: 32px;
   max-width: 56ch;
   font-size: 15px;
   line-height: 1.5;
   color: var(--text-secondary);
+}
+
+.fine {
+  margin-top: 20px;
+  max-width: 60ch;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* ---------- longs and shorts ---------- */
+
+.split {
+  display: flex;
+  gap: 4px;
+  height: 14px;
+}
+
+.split span {
+  min-width: 6px;
+  border-radius: 4px;
+}
+
+.splitLong { background: var(--long); }
+.splitShort { background: var(--short); }
+
+.faceoff {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 72px;
+  margin-top: 36px;
+}
+
+.sideHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.swLong { background: var(--long); }
+.swShort { background: var(--short); }
+
+.sideName {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.sideNum {
+  margin-top: 18px;
+  font-family: var(--serif);
+  font-variation-settings: 'SOFT' 100;
+  font-size: clamp(40px, 5.6vw, 68px);
+  line-height: 1;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.sideSub {
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.sideEmpty {
+  margin-top: 18px;
+  font-size: 15px;
+  color: var(--text-secondary);
+}
+
+.facts {
+  margin-top: 28px;
+}
+
+.fact {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--rule);
+  font-size: 15px;
+}
+
+.fact dt { color: var(--text-secondary); }
+.fact dd { font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* ---------- hold time ---------- */
+
+.holdGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.holdCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.holdPct {
+  font-family: var(--serif);
+  font-variation-settings: 'SOFT' 100;
+  font-size: clamp(24px, 3vw, 36px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.meter {
+  position: relative;
+  width: min(44px, 70%);
+  height: 170px;
+  margin-top: 16px;
+  display: flex;
+  align-items: flex-end;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--text-secondary) 12%, transparent);
+  overflow: hidden;
+}
+
+.meterFill {
+  display: block;
+  width: 100%;
+  border-radius: 5px 5px 0 0;
+  transform-origin: bottom;
+  animation: rise 0.9s cubic-bezier(0.22, 0.7, 0.2, 1) both;
+}
+
+@keyframes rise {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+.meterGain { background: var(--gain); }
+.meterLoss { background: var(--loss); }
+.meterFlat { background: var(--text-secondary); }
+
+.meterMid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1px dashed color-mix(in srgb, var(--text-primary) 55%, transparent);
+}
+
+.holdPnl {
+  margin-top: 14px;
+  font-size: 15px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.holdLabel {
+  margin-top: 2px;
+  font-size: 14px;
+}
+
+.holdCount {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.compare {
+  margin-top: 44px;
+  max-width: 560px;
+}
+
+.cmpRow {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) 64px;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 0;
+  font-size: 15px;
+}
+
+.cmpLabel { color: var(--text-secondary); }
+
+.cmpTrack {
+  display: block;
+  height: 8px;
+}
+
+.cmpFill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+}
+
+.cmpGain { background: var(--gain); }
+.cmpLoss { background: var(--loss); }
+
+.cmpVal {
+  text-align: right;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- time of day ---------- */
+
+.hoursWrap {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.hours {
+  display: flex;
+  gap: 6px;
+  min-width: max-content;
+  width: 100%;
+}
+
+.hour {
+  flex: 1 1 0;
+  min-width: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hourBlock {
+  position: relative;
+  width: 100%;
+  height: 96px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.hourBlock::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--c);
+  opacity: var(--i, 0);
+}
+
+.hourGain { --c: var(--gain); }
+.hourLoss { --c: var(--loss); }
+
+.hourEmpty {
+  border: 1px dashed var(--rule);
+}
+
+.hourPnl {
+  position: relative;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.hourLabel {
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.hourCount {
+  margin-top: 2px;
+  min-height: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ---------- after a win, after a loss ---------- */
+
+.after {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 72px;
+}
+
+.afterCol {
+  display: flex;
+  flex-direction: column;
+}
+
+.afterCol .bigNum {
+  font-size: clamp(44px, 6vw, 76px);
+}
+
+/* ---------- distribution ---------- */
+
+.histo {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 200px;
+}
+
+.hBar {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 3px 3px 0 0;
+}
+
+.zeroTick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px dashed color-mix(in srgb, var(--text-primary) 55%, transparent);
+  pointer-events: none;
+}
+
+.histoAxis {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.histoZero {
+  position: absolute;
+  transform: translateX(-50%);
 }
 
 /* breakdown rows with a bar that grows from the middle */
@@ -495,12 +923,21 @@
   place-items: center;
 }
 
+/* no two pebbles are quite the same shape */
+
 .pebble {
   display: block;
   width: calc(var(--min) + var(--span) * var(--s));
   aspect-ratio: 1;
   border-radius: 50%;
+  transition: transform 0.35s cubic-bezier(0.3, 1.7, 0.5, 1);
 }
+
+.cell:nth-child(4n + 1) .pebble { border-radius: 54% 46% 52% 48% / 48% 55% 45% 52%; }
+.cell:nth-child(4n + 2) .pebble { border-radius: 46% 54% 48% 52% / 55% 47% 53% 45%; }
+.cell:nth-child(4n + 3) .pebble { border-radius: 52% 48% 56% 44% / 46% 52% 48% 54%; }
+
+.cell:hover .pebble { transform: scale(1.18) rotate(-6deg); }
 
 .pebbleGain { background: var(--gain); }
 .pebbleLoss { background: var(--loss); }
@@ -572,7 +1009,12 @@
 @media (max-width: 900px) {
   .pair {
     grid-template-columns: 1fr;
-    gap: 96px;
+    gap: 112px;
+  }
+
+  .faceoff,
+  .after {
+    gap: 40px;
   }
 }
 
@@ -589,6 +1031,8 @@
 
   .title { margin-bottom: 36px; }
 
+  .story { margin-top: 40px; }
+
   .headline {
     gap: 16px;
     margin-top: 64px;
@@ -596,12 +1040,30 @@
 
   .bigNote { display: none; }
 
+  .afterCol .bigNote { display: block; }
+
   .ledger {
     grid-template-columns: 1fr;
     margin-top: 56px;
   }
 
-  .section { margin-top: 80px; }
+  .section { margin-top: 88px; }
+
+  .faceoff {
+    grid-template-columns: 1fr;
+    gap: 56px;
+  }
+
+  .after {
+    gap: 20px;
+  }
+
+  .holdGrid { gap: 8px; }
+  .meter { height: 130px; }
+  .holdLabel { font-size: 12px; }
+  .holdCount { display: none; }
+
+  .cmpRow { grid-template-columns: 96px minmax(0, 1fr) 56px; gap: 10px; }
 
   .row {
     grid-template-columns: minmax(0, 1fr) 56px 64px;
@@ -622,7 +1084,20 @@
 /* ---------- motion preferences ---------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .plot { animation: none; }
-  .loading span { animation: none; }
-  .iconBtn { transition: none; }
+  .auraUp::before,
+  .auraDown::before,
+  .auraUp::after,
+  .auraDown::after,
+  .plot,
+  .pulse,
+  .pulse::after,
+  .meterFill,
+  .loading span {
+    animation: none;
+  }
+
+  .pebble,
+  .iconBtn {
+    transition: none;
+  }
 }
