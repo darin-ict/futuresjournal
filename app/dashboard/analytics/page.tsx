@@ -1,3 +1,4 @@
+
 'use client'
 import { useState, useEffect, useId } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -66,6 +67,38 @@ const plural = (n: number, one: string, many: string) => (n === 1 ? one : many)
 
 function sum(list: Trade[]) {
   return list.reduce((s, t) => s + t.pnl, 0)
+}
+
+// Always interpret trading dates and hours in New York time.
+function nyParts(value: string | Date) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    weekday: 'long',
+    hour: 'numeric',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(value))
+
+  const get = (type: string) => parts.find(p => p.type === type)?.value
+
+  return {
+    year: Number(get('year')),
+    month: Number(get('month')),
+    day: Number(get('day')),
+    weekday: get('weekday')!,
+    hour: Number(get('hour')),
+  }
+}
+
+function nyDateKey(value: string | Date) {
+  const p = nyParts(value)
+  return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`
+}
+
+function calendarDateKey(year: number, month: number, day: number) {
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
 // Same definitions the page has always used: breakevens count as wins for win rate.
@@ -508,16 +541,22 @@ function Breakdown({ rows }: { rows: Row[] }) {
 
 function CalendarView({ trades }: { trades: Trade[] }) {
   const [currentMonth, setCurrentMonth] = useState(() => {
-    const latest = Math.max(...trades.map(t => new Date(t.entry_time).getTime()))
-    return Number.isFinite(latest) ? new Date(latest) : new Date()
+    const latest = trades.length > 0
+      ? trades.reduce((a, b) =>
+          new Date(a.entry_time).getTime() > new Date(b.entry_time).getTime() ? a : b
+        )
+      : null
+
+    const p = nyParts(latest ? latest.entry_time : new Date())
+    return new Date(p.year, p.month - 1, 1, 12)
   })
 
   const year = currentMonth.getFullYear()
   const month = currentMonth.getMonth()
 
   const monthTrades = trades.filter(t => {
-    const d = new Date(t.entry_time)
-    return d.getFullYear() === year && d.getMonth() === month
+    const p = nyParts(t.entry_time)
+    return p.year === year && p.month - 1 === month
   })
 
   const monthPnl = sum(monthTrades)
@@ -527,28 +566,27 @@ function CalendarView({ trades }: { trades: Trade[] }) {
 
   const pnlByDate: Record<string, number> = {}
   trades.forEach(t => {
-    const d = new Date(t.entry_time).toDateString()
-    pnlByDate[d] = (pnlByDate[d] || 0) + t.pnl
+    const key = nyDateKey(t.entry_time)
+    pnlByDate[key] = (pnlByDate[key] || 0) + t.pnl
   })
 
+  const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`
   const monthDayPnls = Object.entries(pnlByDate)
-    .filter(([k]) => {
-      const d = new Date(k)
-      return d.getFullYear() === year && d.getMonth() === month
-    })
-    .map(([, v]) => Math.abs(v))
+    .filter(([key]) => key.startsWith(`${monthPrefix}-`))
+    .map(([, value]) => Math.abs(value))
+
   const maxDay = Math.max(...monthDayPnls, 1)
 
   const firstDay = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const today = new Date().toDateString()
+  const today = nyDateKey(new Date())
 
   const cells: (number | null)[] = []
   for (let i = 0; i < firstDay; i++) cells.push(null)
   for (let i = 1; i <= daysInMonth; i++) cells.push(i)
 
-  const prevMonth = () => setCurrentMonth(new Date(year, month - 1, 1))
-  const nextMonth = () => setCurrentMonth(new Date(year, month + 1, 1))
+  const prevMonth = () => setCurrentMonth(new Date(year, month - 1, 1, 12))
+  const nextMonth = () => setCurrentMonth(new Date(year, month + 1, 1, 12))
 
   const breakdown =
     monthTrades.length === 0
@@ -590,10 +628,12 @@ function CalendarView({ trades }: { trades: Trade[] }) {
       <div className={styles.calGrid}>
         {cells.map((day, i) => {
           if (!day) return <div key={`empty-${i}`} className={styles.cellEmpty} />
-          const dateStr = new Date(year, month, day).toDateString()
+
+          const dateStr = calendarDateKey(year, month, day)
           const pnl = pnlByDate[dateStr]
           const hasTrades = pnl !== undefined
           const size = hasTrades ? Math.sqrt(Math.abs(pnl) / maxDay) : 0
+
           return (
             <div key={day} className={styles.cell} title={hasTrades ? signed(pnl) : undefined}>
               <span className={`${styles.dayNum} ${dateStr === today ? styles.dayToday : ''}`}>{day}</span>
@@ -670,7 +710,12 @@ export default function Analytics() {
     peak = Math.max(peak, cum)
     maxDrawdown = Math.max(maxDrawdown, peak - cum)
     return {
-      date: new Date(t.entry_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      date: new Date(t.entry_time).toLocaleDateString('en-US', {
+        timeZone: 'America/New_York',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
       value: cum,
       pnl: t.pnl,
     }
@@ -678,7 +723,7 @@ export default function Analytics() {
 
   const pnlByDay: Record<string, number> = {}
   trades.forEach(t => {
-    const k = new Date(t.entry_time).toDateString()
+    const k = nyDateKey(t.entry_time)
     pnlByDay[k] = (pnlByDay[k] || 0) + t.pnl
   })
   const tradingDays = Object.keys(pnlByDay).length
@@ -734,7 +779,7 @@ export default function Analytics() {
 
   const hourLists: Record<number, Trade[]> = {}
   timed.forEach(({ t }) => {
-    const h = new Date(t.entry_time).getHours()
+    const h = nyParts(t.entry_time).hour
     if (!hourLists[h]) hourLists[h] = []
     hourLists[h].push(t)
   })
@@ -808,7 +853,7 @@ export default function Analytics() {
   const byDay: Record<string, { pnl: number; count: number; wins: number }> = {}
   dayNames.forEach(d => { byDay[d] = { pnl: 0, count: 0, wins: 0 } })
   trades.forEach(t => {
-    const day = dayNames[new Date(t.entry_time).getDay()]
+    const day = nyParts(t.entry_time).weekday
     byDay[day].pnl += t.pnl
     byDay[day].count++
     if (t.pnl > 0) byDay[day].wins++
