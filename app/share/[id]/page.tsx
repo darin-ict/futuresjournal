@@ -11,14 +11,19 @@ export default function SharePage() {
 
   useEffect(() => {
     const fetchTrade = async () => {
-      const { data } = await supabase
-        .from('trades')
-        .select('*')
-        .eq('id', params.id)
-        .eq('is_public', true)
-        .single()
-      setTrade(data)
-      setLoading(false)
+     const { data, error } = await supabase
+  .from('trades')
+  .select('*')
+  .eq('id', params.id)
+  .eq('is_public', true)
+  .single()
+
+if (error) {
+  console.error('PUBLIC SHARE ERROR:', error)
+}
+
+setTrade(data)
+setLoading(false)
     }
     fetchTrade()
   }, [params.id])
