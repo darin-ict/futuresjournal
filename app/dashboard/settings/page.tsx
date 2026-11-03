@@ -171,18 +171,14 @@ export default function Settings() {
         const pair = (row['pair'] || '').toUpperCase()
         const instrument = pairMap[pair] || pair
 
-        const direction =
-          (row['side'] || '').toLowerCase() === 'buy'
-            ? 'LONG'
-            : 'SHORT'
+        const rawSide = (row['side'] || '').toLowerCase()
+        const direction = rawSide === 'buy' || rawSide === 'long' ? 'LONG' : 'SHORT'
 
         const entryPrice = parseFloat(row['entryprice'] || '0')
         const exitPrice = parseFloat(row['avgcloseprice'] || '0')
         const pnl = parseFloat(row['rpnl'] || '0')
 
-        const contracts =
-          Math.round(parseFloat(row['amount'] || '1')) || 1
-
+        const contracts = Math.round(parseFloat(row['amount'] || '1')) || 1
         const status = (row['status'] || '').toLowerCase()
 
         if (
@@ -197,28 +193,18 @@ export default function Settings() {
         }
 
         let entryTime = new Date().toISOString()
-
         if (row['datestart']) {
-          const normalized = row['datestart']
-            .replace(/\//g, '-')
-            .replace(' ', 'T')
-
+          const normalized = row['datestart'].replace(/\//g, '-').replace(' ', 'T')
           const parsed = new Date(normalized)
-
           if (!isNaN(parsed.getTime())) {
             entryTime = parsed.toISOString()
           }
         }
 
         let exitTime: string | null = null
-
         if (row['dateend']) {
-          const normalized = row['dateend']
-            .replace(/\//g, '-')
-            .replace(' ', 'T')
-
+          const normalized = row['dateend'].replace(/\//g, '-').replace(' ', 'T')
           const parsed = new Date(normalized)
-
           if (!isNaN(parsed.getTime())) {
             exitTime = parsed.toISOString()
           }
@@ -227,14 +213,14 @@ export default function Settings() {
         return {
           symbol: (instrument.split(':').pop() || instrument),
           instrument,
-          direction, // <-- 'side' property successfully removed here
+          direction, // <-- 'side' property is completely removed here!
           entry_price: entryPrice,
           exit_price: exitPrice,
           pnl,
           contracts,
           entry_time: entryTime,
           exit_time: exitTime,
-          setup_tag: row['tags'] || null,
+          setup_tag: row['tags'] && row['tags'] !== 'nan' ? row['tags'] : null,
         }
       } catch (err) {
         console.error('FXReplay parse error:', err)
