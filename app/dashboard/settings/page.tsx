@@ -302,6 +302,11 @@ export default function Settings() {
       headers.includes('buyprice') ||
       headers.includes('boughttimestamp')
 
+    const isCustomCSV =
+      headers.includes('entry price') &&
+      headers.includes('exit price') &&
+      headers.includes('p&l')
+
     let tradesToInsert: any[] = []
     let skipped = 0
     const errors: string[] = []
@@ -419,12 +424,70 @@ export default function Settings() {
           skipped++
         }
       }
+    } else if (isCustomCSV) {
+      for (const row of rows) {
+        try {
+          const instrumentRaw = row['instrument'] || ''
+          const base = getBase(instrumentRaw.split(':').pop() || instrumentRaw)
+          
+          const direction =
+            (row['direction'] || 'LONG').toUpperCase() === 'SHORT'
+              ? 'SHORT'
+              : 'LONG'
+
+          const entryPrice = parseFloat(row['entry price'] || '0')
+          const exitPrice = parseFloat(row['exit price'] || '0')
+          const contracts = parseInt(row['contracts'] || '1') || 1
+          const pnl = parseFloat(row['p&l'] || '0')
+          const setupTag = row['setup tag'] || null
+          const mistakeTag = row['mistake tag'] || null
+          const notes = row['notes'] || null
+
+          if (
+            !base ||
+            Number.isNaN(entryPrice) ||
+            Number.isNaN(exitPrice) ||
+            !entryPrice ||
+            !exitPrice
+          ) {
+            skipped++
+            continue
+          }
+
+          let entryTime = new Date().toISOString()
+          if (row['date']) {
+            const parsed = new Date(row['date'])
+            if (!isNaN(parsed.getTime())) {
+              entryTime = parsed.toISOString()
+            }
+          }
+
+          tradesToInsert.push({
+            user_id: user.id,
+            instrument: base,
+            direction,
+            entry_price: entryPrice,
+            exit_price: exitPrice,
+            contracts,
+            pnl,
+            setup_tag: setupTag && setupTag !== 'nan' ? setupTag : null,
+            mistake_tag: mistakeTag && mistakeTag !== 'nan' ? mistakeTag : null,
+            notes: notes && notes !== 'nan' ? notes : null,
+            entry_time: entryTime,
+            exit_time: entryTime,
+            is_open: false,
+          })
+        } catch (err) {
+          console.error('Custom CSV parse error:', err)
+          skipped++
+        }
+      }
     } else {
       setImportResults({
         success: 0,
         skipped: rows.length,
         errors: [
-          'Unknown CSV format. Supported: Tradovate, FXReplay',
+          'Unknown CSV format. Supported: Tradovate, FXReplay, FuturesJournal CSV',
         ],
       })
 
@@ -646,6 +709,7 @@ const handleExportCSV = async () => {
               <ol className={styles.instrList}>
                 <li><strong>Tradovate</strong> — Account → Performance → Export CSV</li>
                 <li><strong>FXReplay</strong> — Analytics → Export CSV</li>
+                <li><strong>FuturesJournal CSV</strong> — Custom export format</li>
               </ol>
             </div>
 
