@@ -164,6 +164,7 @@ export default function Settings() {
     USOILUSD: 'CL',
     XAUUSD: 'GC',
     XAGUSD: 'SI',
+    'CME_MINI:MNQ': 'MNQ',
   }
 
   return rows.map(row => {
@@ -226,17 +227,17 @@ export default function Settings() {
 
       
       return {
-        symbol: (instrument.split(':').pop() || instrument),
-        instrument,
-        side: direction === 'LONG' ? 'buy' : 'sell',
-        direction,
-        entry_price: entryPrice,
-        exit_price: exitPrice,
-        pnl,
-        contracts,
-        entry_time: entryTime,
-        exit_time: exitTime,
-        setup_tag: row['tags'] || null,
+  symbol: (instrument.split(':').pop() || instrument),
+  instrument,
+  direction,
+  entry_price: entryPrice,
+  exit_price: exitPrice,
+  pnl,
+  contracts,
+  entry_time: entryTime,
+  exit_time: exitTime,
+  setup_tag: row['tags'] || null,
+}
       }
     } catch (err) {
       console.error('FXReplay parse error:', err)
