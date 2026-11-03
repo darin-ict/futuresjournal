@@ -226,8 +226,7 @@ const parseFXReplayRows = (rows: Record<string, string>[]) => {
         }
       }
 
-      return {
-        symbol: instrument,
+     return {
         instrument,
         direction,
         entry_price: entryPrice,
