@@ -157,7 +157,8 @@ export default function Settings() {
     return s.replace(/[A-Z]\d+$/, '') || s
   }
 
-  const parseFXReplayRows = (rows: Record<string, string>[]) => {
+  
+const parseFXReplayRows = (rows: Record<string, string>[]) => {
   const pairMap: Record<string, string> = {
     USATECHIDXUSD: 'NQ',
     USAIDXUSD: 'ES',
@@ -200,44 +201,42 @@ export default function Settings() {
       let entryTime = new Date().toISOString()
 
       if (row['datestart']) {
-  const normalized = row['datestart']
-    .replace(/\//g, '-')
-    .replace(' ', 'T')
+        const normalized = row['datestart']
+          .replace(/\//g, '-')
+          .replace(' ', 'T')
 
-  const parsed = new Date(normalized)
+        const parsed = new Date(normalized)
 
-  if (!isNaN(parsed.getTime())) {
-    entryTime = parsed.toISOString()
-  }
-}
+        if (!isNaN(parsed.getTime())) {
+          entryTime = parsed.toISOString()
+        }
+      }
 
       let exitTime: string | null = null
 
       if (row['dateend']) {
-  const normalized = row['dateend']
-    .replace(/\//g, '-')
-    .replace(' ', 'T')
+        const normalized = row['dateend']
+          .replace(/\//g, '-')
+          .replace(' ', 'T')
 
-  const parsed = new Date(normalized)
+        const parsed = new Date(normalized)
 
-  if (!isNaN(parsed.getTime())) {
-    exitTime = parsed.toISOString()
-  }
-}
+        if (!isNaN(parsed.getTime())) {
+          exitTime = parsed.toISOString()
+        }
+      }
 
-      
       return {
-  symbol: (instrument.split(':').pop() || instrument),
-  instrument,
-  direction,
-  entry_price: entryPrice,
-  exit_price: exitPrice,
-  pnl,
-  contracts,
-  entry_time: entryTime,
-  exit_time: exitTime,
-  setup_tag: row['tags'] || null,
-}
+        symbol: instrument,
+        instrument,
+        direction,
+        entry_price: entryPrice,
+        exit_price: exitPrice,
+        pnl,
+        contracts,
+        entry_time: entryTime,
+        exit_time: exitTime,
+        setup_tag: row['tags'] || null,
       }
     } catch (err) {
       console.error('FXReplay parse error:', err)
