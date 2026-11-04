@@ -559,9 +559,9 @@ function CalendarView({ trades }: { trades: Trade[] }) {
   const month = currentMonth.getMonth()
 
   const monthTrades = trades.filter(t => {
-    const p = nyParts(t.entry_time)
-    return p.year === year && p.month - 1 === month
-  })
+  const d = new Date(t.entry_time)
+  return d.getFullYear() === year && d.getMonth() === month
+})
 
   const monthPnl = sum(monthTrades)
   const monthWins = monthTrades.filter(t => t.pnl > 0).length
