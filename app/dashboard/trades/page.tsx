@@ -240,6 +240,12 @@ export default function TradeLog() {
                   <button onClick={() => setDeleteId(selectedTrade.id)} className={styles.popupDeleteBtn}>
                     🗑️ Delete
                   </button>
+          <button
+  onClick={startEditing}
+  className={styles.shareBtn}
+>
+  ✏️ Edit Trade
+</button>
                 )}
               </div>
             </div>
