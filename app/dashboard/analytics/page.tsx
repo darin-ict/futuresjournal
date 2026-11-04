@@ -857,7 +857,7 @@ export default function Analytics() {
   const byDay: Record<string, { pnl: number; count: number; wins: number }> = {}
   dayNames.forEach(d => { byDay[d] = { pnl: 0, count: 0, wins: 0 } })
   trades.forEach(t => {
-    const day = nyParts(t.entry_time).weekday
+    const day = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(t.entry_time).getDay()]
     byDay[day].pnl += t.pnl
     byDay[day].count++
     if (t.pnl > 0) byDay[day].wins++
