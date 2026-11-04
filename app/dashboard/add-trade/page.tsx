@@ -156,7 +156,7 @@ export default function AddTrade() {
       entry_price: parseFloat(form.entry_price),
       exit_price: form.exit_price ? parseFloat(form.exit_price) : null,
       contracts: parseInt(form.contracts),
-      entry_time: new Date(form.trade_date).toISOString(),
+      entry_time: new Date(`${form.trade_date}T12:00:00.000Z`).toISOString(),
       pnl: pnl,
       setup_tag: form.setup_tag || null,
       notes: form.notes || null,
