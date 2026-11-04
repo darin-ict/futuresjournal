@@ -81,6 +81,51 @@ export default function TradeLog() {
 
   setEditingTrade(true)
 }
+  const handleUpdateTrade = async (e: React.FormEvent) => {
+  e.preventDefault()
+
+  if (!selectedTrade) return
+
+  const { error } = await supabase
+    .from('trades')
+    .update({
+      instrument: editForm.instrument,
+      direction: editForm.direction,
+      entry_time: new Date(`${editForm.trade_date}T12:00:00.000Z`).toISOString(),
+      entry_price: Number(editForm.entry_price),
+      exit_price: editForm.exit_price === '' ? null : Number(editForm.exit_price),
+      contracts: Number(editForm.contracts),
+      pnl: editForm.pnl === '' ? null : Number(editForm.pnl),
+      setup_tag: editForm.setup_tag || null,
+      mistake_tag: editForm.mistake_tag || null,
+      notes: editForm.notes || null,
+      is_open: editForm.is_open,
+    })
+    .eq('id', selectedTrade.id)
+    .eq('user_id', user.id)
+
+  if (error) {
+    alert(error.message)
+    return
+  }
+
+  const updatedTrade = {
+    ...selectedTrade,
+    ...editForm,
+    entry_time: new Date(`${editForm.trade_date}T12:00:00.000Z`).toISOString(),
+    entry_price: Number(editForm.entry_price),
+    exit_price: editForm.exit_price === '' ? null : Number(editForm.exit_price),
+    contracts: Number(editForm.contracts),
+    pnl: editForm.pnl === '' ? null : Number(editForm.pnl),
+  }
+
+  setTrades(prev =>
+    prev.map(t => t.id === selectedTrade.id ? updatedTrade : t)
+  )
+
+  setSelectedTrade(updatedTrade)
+  setEditingTrade(false)
+}
 
   const instruments = ['ALL', ...Array.from(new Set(trades.map(t => t.instrument)))]
   const closed = filtered.filter(t => !t.is_open && t.pnl != null)
