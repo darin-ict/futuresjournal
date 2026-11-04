@@ -96,6 +96,10 @@ function nyDateKey(value: string | Date) {
   const p = nyParts(value)
   return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`
 }
+function localDateKey(value: string | Date) {
+  const d = new Date(value)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 function calendarDateKey(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
