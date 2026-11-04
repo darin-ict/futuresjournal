@@ -551,8 +551,8 @@ function CalendarView({ trades }: { trades: Trade[] }) {
         )
       : null
 
-    const p = nyParts(latest ? latest.entry_time : new Date())
-    return new Date(p.year, p.month - 1, 1, 12)
+    const d = new Date(latest ? latest.entry_time : new Date())
+    return new Date(d.getFullYear(), d.getMonth(), 1, 12)
   })
 
   const year = currentMonth.getFullYear()
