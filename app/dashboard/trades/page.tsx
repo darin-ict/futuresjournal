@@ -62,6 +62,25 @@ export default function TradeLog() {
     setDeleteId(null)
     if (selectedTrade?.id === id) setSelectedTrade(null)
   }
+  const startEditing = () => {
+  if (!selectedTrade) return
+
+  setEditForm({
+    instrument: selectedTrade.instrument,
+    direction: selectedTrade.direction,
+    trade_date: new Date(selectedTrade.entry_time).toISOString().slice(0, 10),
+    entry_price: selectedTrade.entry_price ?? '',
+    exit_price: selectedTrade.exit_price ?? '',
+    contracts: selectedTrade.contracts ?? 1,
+    pnl: selectedTrade.pnl ?? '',
+    setup_tag: selectedTrade.setup_tag ?? '',
+    mistake_tag: selectedTrade.mistake_tag ?? '',
+    notes: selectedTrade.notes ?? '',
+    is_open: selectedTrade.is_open ?? false,
+  })
+
+  setEditingTrade(true)
+}
 
   const instruments = ['ALL', ...Array.from(new Set(trades.map(t => t.instrument)))]
   const closed = filtered.filter(t => !t.is_open && t.pnl != null)
