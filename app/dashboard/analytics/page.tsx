@@ -583,7 +583,7 @@ function CalendarView({ trades }: { trades: Trade[] }) {
 
   const firstDay = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const today = nyDateKey(new Date())
+  const today = localDateKey(new Date())
 
   const cells: (number | null)[] = []
   for (let i = 0; i < firstDay; i++) cells.push(null)
