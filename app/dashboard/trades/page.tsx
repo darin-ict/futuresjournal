@@ -18,6 +18,8 @@ export default function TradeLog() {
   const [sortBy, setSortBy] = useState('newest')
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [selectedTrade, setSelectedTrade] = useState<any>(null)
+  const [editingTrade, setEditingTrade] = useState(false)
+  const [editForm, setEditForm] = useState<any>({})
 
   useEffect(() => {
     const getUser = async () => {
