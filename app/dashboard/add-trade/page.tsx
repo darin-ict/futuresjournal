@@ -25,7 +25,7 @@ export default function AddTrade() {
     exit_price: '',
     stop_loss: '',
     contracts: '1',
-    trade_date: new Date().toISOString().split('T')[0],
+    trade_date: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
     setup_tag: '',
     mistake_tag: '',
     notes: '',
@@ -196,7 +196,7 @@ export default function AddTrade() {
     setScreenshotPreview(null)
     setForm({
       instrument: 'ES', direction: 'LONG', entry_price: '', exit_price: '',
-      stop_loss: '', contracts: '1', trade_date: new Date().toISOString().split('T')[0],
+      stop_loss: '', contracts: '1', trade_date: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
       setup_tag: '', mistake_tag: '', notes: '', is_open: false, challenge_id: '',
     })
   }
