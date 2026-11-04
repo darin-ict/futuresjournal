@@ -570,7 +570,7 @@ function CalendarView({ trades }: { trades: Trade[] }) {
 
   const pnlByDate: Record<string, number> = {}
   trades.forEach(t => {
-    const key = nyDateKey(t.entry_time)
+    const key = localDateKey(t.entry_time)
     pnlByDate[key] = (pnlByDate[key] || 0) + t.pnl
   })
 
