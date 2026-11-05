@@ -6,6 +6,29 @@ import Link from 'next/link'
 import Sidebar from '../../components/Sidebar'
 import styles from './trades.module.css'
 
+const TICK_VALUES: Record<string, number> = {
+  ES: 12.50, NQ: 5.00, CL: 10.00, GC: 10.00,
+  SI: 25.00, ZB: 31.25, ZN: 15.625, RTY: 5.00,
+  YM: 5.00, MES: 1.25, MNQ: 0.50, MCL: 1.00,
+}
+const TICK_SIZES: Record<string, number> = {
+  ES: 0.25, NQ: 0.25, CL: 0.01, GC: 0.10,
+  SI: 0.005, ZB: 0.03125, ZN: 0.015625, RTY: 0.10,
+  YM: 1.00, MES: 0.25, MNQ: 0.25, MCL: 0.01,
+}
+const MISTAKES = ['Chased entry','Ignored stop','Overtraded','Sized too large','FOMO','Revenge trade','No setup','Exited too early','Moved stop']
+
+const calcPnl = (f: any) => {
+  const entry = parseFloat(f.entry_price)
+  const exit = parseFloat(f.exit_price)
+  const contracts = parseInt(f.contracts)
+  if (!entry || !exit || !contracts) return ''
+  const tickValue = TICK_VALUES[f.instrument] || 12.50
+  const tickSize = TICK_SIZES[f.instrument] || 0.25
+  const diff = f.direction === 'LONG' ? exit - entry : entry - exit
+  return parseFloat(((diff / tickSize) * tickValue * contracts).toFixed(2))
+}
+
 export default function TradeLog() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
@@ -56,11 +79,25 @@ export default function TradeLog() {
     setFiltered(result)
   }, [filterDirection, filterInstrument, filterResult, sortBy, trades])
 
+  const closePopup = () => {
+    setSelectedTrade(null)
+    setEditingTrade(false)
+  }
+
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target
+    const next = { ...editForm, [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value }
+    if (['entry_price', 'exit_price', 'contracts', 'direction', 'instrument'].includes(name)) {
+      next.pnl = calcPnl(next)
+    }
+    setEditForm(next)
+  }
+
   const handleDelete = async (id: string) => {
     await supabase.from('trades').delete().eq('id', id)
     setTrades(prev => prev.filter(t => t.id !== id))
     setDeleteId(null)
-    if (selectedTrade?.id === id) setSelectedTrade(null)
+    if (selectedTrade?.id === id) closePopup()
   }
   const startEditing = () => {
   if (!selectedTrade) return
@@ -109,6 +146,27 @@ export default function TradeLog() {
     return
   }
 
+  // keep prop firm balance in sync if this trade belongs to a challenge
+  if (selectedTrade.challenge_id) {
+    const effective = (open: boolean, p: number | null) => (!open && p != null ? p : 0)
+    const oldEff = effective(selectedTrade.is_open, selectedTrade.pnl)
+    const newEff = effective(editForm.is_open, editForm.pnl === '' ? null : Number(editForm.pnl))
+    const delta = newEff - oldEff
+    if (delta !== 0) {
+      const { data: ch } = await supabase
+        .from('prop_challenges')
+        .select('current_balance')
+        .eq('id', selectedTrade.challenge_id)
+        .single()
+      if (ch) {
+        await supabase
+          .from('prop_challenges')
+          .update({ current_balance: ch.current_balance + delta })
+          .eq('id', selectedTrade.challenge_id)
+      }
+    }
+  }
+
   const updatedTrade = {
     ...selectedTrade,
     ...editForm,
@@ -151,7 +209,7 @@ export default function TradeLog() {
 
       {/* Trade Detail Popup */}
       {selectedTrade && (
-        <div className={styles.overlay} onClick={() => setSelectedTrade(null)}>
+        <div className={styles.overlay} onClick={closePopup}>
           <div className={styles.popup} onClick={e => e.stopPropagation()}>
             <div className={styles.popupHeader}>
               <div className={styles.popupTitle}>
@@ -163,9 +221,72 @@ export default function TradeLog() {
                   {selectedTrade.pnl != null ? `${selectedTrade.pnl > 0 ? '+' : ''}$${selectedTrade.pnl.toFixed(2)}` : 'OPEN'}
                 </span>
               </div>
-              <button onClick={() => setSelectedTrade(null)} className={styles.popupClose}>✕</button>
+              <button onClick={closePopup} className={styles.popupClose}>✕</button>
             </div>
 
+            {editingTrade ? (
+              <form onSubmit={handleUpdateTrade} className={styles.editForm}>
+                <div className={styles.editGrid}>
+                  <label className={styles.editField}>
+                    <span>Instrument</span>
+                    <select name="instrument" value={editForm.instrument} onChange={handleEditChange} className={styles.editInput}>
+                      {Object.keys(TICK_VALUES).map(i => <option key={i}>{i}</option>)}
+                    </select>
+                  </label>
+                  <label className={styles.editField}>
+                    <span>Direction</span>
+                    <select name="direction" value={editForm.direction} onChange={handleEditChange} className={styles.editInput}>
+                      <option value="LONG">LONG</option>
+                      <option value="SHORT">SHORT</option>
+                    </select>
+                  </label>
+                  <label className={styles.editField}>
+                    <span>Date</span>
+                    <input name="trade_date" type="date" value={editForm.trade_date} onChange={handleEditChange} className={styles.editInput} required />
+                  </label>
+                  <label className={styles.editField}>
+                    <span>Contracts</span>
+                    <input name="contracts" type="number" min="1" step="1" value={editForm.contracts} onChange={handleEditChange} className={styles.editInput} required />
+                  </label>
+                  <label className={styles.editField}>
+                    <span>Entry Price</span>
+                    <input name="entry_price" type="number" step="any" value={editForm.entry_price} onChange={handleEditChange} className={styles.editInput} required />
+                  </label>
+                  <label className={styles.editField}>
+                    <span>Exit Price</span>
+                    <input name="exit_price" type="number" step="any" value={editForm.exit_price} onChange={handleEditChange} className={styles.editInput} />
+                  </label>
+                  <label className={styles.editField}>
+                    <span>P&L ($) — auto-calculated, you can override</span>
+                    <input name="pnl" type="number" step="any" value={editForm.pnl} onChange={handleEditChange} className={styles.editInput} />
+                  </label>
+                  <label className={styles.editField}>
+                    <span>Setup</span>
+                    <input name="setup_tag" type="text" value={editForm.setup_tag} onChange={handleEditChange} className={styles.editInput} />
+                  </label>
+                  <label className={styles.editField}>
+                    <span>Mistake</span>
+                    <select name="mistake_tag" value={editForm.mistake_tag} onChange={handleEditChange} className={styles.editInput}>
+                      <option value="">No mistake</option>
+                      {MISTAKES.map(m => <option key={m}>{m}</option>)}
+                    </select>
+                  </label>
+                  <label className={`${styles.editField} ${styles.editCheck}`}>
+                    <input name="is_open" type="checkbox" checked={!!editForm.is_open} onChange={handleEditChange} />
+                    <span>Trade is still open</span>
+                  </label>
+                </div>
+                <label className={styles.editField}>
+                  <span>Notes</span>
+                  <textarea name="notes" rows={3} value={editForm.notes} onChange={handleEditChange} className={styles.editInput} />
+                </label>
+                <div className={styles.editActions}>
+                  <button type="button" onClick={() => setEditingTrade(false)} className={styles.confirmNo}>Cancel</button>
+                  <button type="submit" className={styles.btnPrimary}>Save Changes</button>
+                </div>
+              </form>
+            ) : (
+            <>
             <div className={styles.popupGrid}>
               <div className={styles.popupStat}>
                 <span className={styles.popupStatLabel}>Date</span>
@@ -250,6 +371,8 @@ export default function TradeLog() {
                 </button>
               </div>
             </div>
+            </>
+            )}
           </div>
         </div>
       )}
