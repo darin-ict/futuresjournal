@@ -699,11 +699,34 @@ export default function Analytics() {
   const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : 0
   const payoffRatio = all.avgLoss > 0 ? all.avgWin / all.avgLoss : 0
 
-  let maxConsecWins = 0, maxConsecLosses = 0, curWins = 0, curLosses = 0
-  trades.forEach(t => {
-    if (t.pnl > 0) { curWins++; curLosses = 0; maxConsecWins = Math.max(maxConsecWins, curWins) }
-    else { curLosses++; curWins = 0; maxConsecLosses = Math.max(maxConsecLosses, curLosses) }
-  })
+const streakTrades = [...trades].sort(
+  (a, b) => new Date(a.entry_time).getTime() - new Date(b.entry_time).getTime()
+)
+
+let maxConsecWins = 0
+let maxConsecLosses = 0
+let curWins = 0
+let curLosses = 0
+
+streakTrades.forEach(t => {
+  if (t.pnl > 0) {
+    curWins++
+    curLosses = 0
+    maxConsecWins = Math.max(maxConsecWins, curWins)
+  } else if (t.pnl < 0) {
+    curLosses++
+    curWins = 0
+    maxConsecLosses = Math.max(maxConsecLosses, curLosses)
+  } else {
+    if (curWins > 0) {
+      curWins++
+      maxConsecWins = Math.max(maxConsecWins, curWins)
+    } else if (curLosses > 0) {
+      curLosses++
+      maxConsecLosses = Math.max(maxConsecLosses, curLosses)
+    }
+  }
+})
 
   const sorted = [...trades].sort((a, b) => new Date(a.entry_time).getTime() - new Date(b.entry_time).getTime())
   let cum = 0
